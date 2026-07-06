@@ -10,10 +10,22 @@
     MODEL_MISSING: "Тип карточки не найден — открой попап расширения",
     UNKNOWN: "Ошибка Anki",
   };
-  const errText = (res) => ERROR_TEXT[res?.code] ?? res?.message ?? ERROR_TEXT.UNKNOWN;
+  const errText = (res) => {
+    if (String(res?.message ?? "").toLowerCase().includes("context invalidated")) {
+      return "Расширение обновилось — обнови страницу (F5)";
+    }
+    return ERROR_TEXT[res?.code] ?? res?.message ?? ERROR_TEXT.UNKNOWN;
+  };
 
-  const send = (msg) =>
-    api.runtime.sendMessage(msg).catch((e) => ({ ok: false, code: "UNKNOWN", message: String(e?.message ?? e) }));
+  // async wrapper also catches the synchronous throw that happens when the
+  // extension was reloaded and this page still runs the old content script
+  const send = async (msg) => {
+    try {
+      return await api.runtime.sendMessage(msg);
+    } catch (e) {
+      return { ok: false, code: "UNKNOWN", message: String(e?.message ?? e) };
+    }
+  };
 
   const CSS = `
     :host { all: initial; }
