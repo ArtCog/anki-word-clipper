@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Anki Word Clipper",
+  "version": "0.1.0",
+  "description": "Быстро добавляет выделенное слово с контекстом предложения в Anki через AnkiConnect. Работает только локально.",
+  "permissions": ["storage", "contextMenus", "activeTab"],
+  "host_permissions": ["http://127.0.0.1:8765/*"],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["anki-client.js", "background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["context-extract.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "commands": {
+    "open-clipper-form": {
+      "suggested_key": { "default": "Alt+A" },
+      "description": "Добавить выделение в Anki (форма)"
+    }
+  },
+  "browser_specific_settings": {
+    "gecko": { "id": "anki-word-clipper@arturx.art", "strict_min_version": "115.0" }
+  }
+}
