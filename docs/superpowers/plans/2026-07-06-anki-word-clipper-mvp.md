@@ -248,9 +248,21 @@ const ABBREVIATIONS = [
 
 const ENDERS = new Set([".", "!", "?", "…"]);
 
+// True when the dot at dotIndex sits anywhere inside a known abbreviation
+// (not only at its end — "z. B." must shield its first dot too), and the
+// abbreviation starts at a word boundary.
+// DEVIATION (executed): original endsWith() version failed the z. B. test —
+// the first dot of a multi-dot abbreviation triggered a boundary.
 function isAbbreviation(text, dotIndex) {
-  const head = text.slice(0, dotIndex + 1);
-  return ABBREVIATIONS.some((a) => head.endsWith(a));
+  return ABBREVIATIONS.some((a) => {
+    for (let p = a.indexOf("."); p !== -1; p = a.indexOf(".", p + 1)) {
+      const s = dotIndex - p;
+      if (s < 0 || !text.startsWith(a, s)) continue;
+      if (s > 0 && /[\p{L}\p{N}]/u.test(text[s - 1])) continue; // inside a word
+      return true;
+    }
+    return false;
+  });
 }
 
 // A char at index i ends a sentence if it is .!?… followed by whitespace and
