@@ -19,7 +19,7 @@ const MODEL_DEF = {
     {
       Name: "Word → Translation",
       Front: `<div class="word">{{Word}}</div>`,
-      Back: `{{FrontSide}}<hr id="answer"><div class="translation">{{Translation}}</div><div class="context">{{Context}}</div><div class="source">{{Source}}</div>`,
+      Back: `{{FrontSide}}<hr id="answer"><div class="translation">{{Translation}}</div><div class="context">{{Context}}</div>`,
     },
     {
       Name: "Translation → Word",
