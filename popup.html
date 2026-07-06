@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 13px/1.45 "Segoe UI", system-ui, sans-serif; background: #0B0F0E; color: #E8EDEB; width: 300px; margin: 0; padding: 14px; }
+  h1 { font-size: 14px; margin: 0 0 10px; color: #3CE5B0; }
+  #status { padding: 8px 10px; border-radius: 8px; margin-bottom: 10px; background: #16211d; }
+  #status.ok { border-left: 3px solid #3CE5B0; }
+  #status.err { border-left: 3px solid #e05252; }
+  #status.checking { opacity: .7; }
+  #help { font-size: 12px; opacity: .85; margin-bottom: 10px; }
+  #help p { margin: 4px 0; }
+  button { background: #3CE5B0; color: #0B0F0E; border: 0; border-radius: 7px; padding: 6px 12px; font-weight: 600; cursor: pointer; margin-bottom: 12px; }
+  button:hover { filter: brightness(1.1); }
+  label { display: flex; gap: 7px; align-items: center; margin: 6px 0; cursor: pointer; }
+  .hint { font-size: 11px; opacity: .55; margin: 12px 0 0; }
+  a { color: #3CE5B0; }
+</style>
+</head>
+<body>
+  <h1>Anki Word Clipper</h1>
+  <div id="status" class="checking">Проверяю соединение…</div>
+  <div id="help" hidden>
+    <p>1. Запусти Anki Desktop.</p>
+    <p>2. Установи аддон AnkiConnect: Tools → Add-ons → Get Add-ons → код <b>2055492159</b>, перезапусти Anki.</p>
+    <p>3. Нажми «Проверить снова» и разреши доступ в диалоге Anki.</p>
+  </div>
+  <button id="retry">Проверить снова</button>
+  <label><input type="checkbox" id="instant"> Мгновенный режим (Shift+клик — форма)</label>
+  <label><input type="checkbox" id="reverse"> Обратная карточка по умолчанию</label>
+  <p class="hint">Выдели текст → кнопка «+ Anki». Или ПКМ → «Добавить в Anki». Hotkey: Alt+A.</p>
+  <script src="popup.js"></script>
+</body>
+</html>
