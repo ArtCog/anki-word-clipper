@@ -32,7 +32,7 @@
       padding: 12px; font-size: 13px; box-shadow: 0 6px 30px rgba(0,0,0,.5);
     }
     .wc-form.show { display: block; }
-    .wc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; color: #3CE5B0; font-weight: 700; }
+    .wc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; color: #3CE5B0; font-weight: 700; cursor: move; user-select: none; touch-action: none; }
     .wc-x { background: none; border: 0; color: #E8EDEB; font-size: 16px; cursor: pointer; opacity: .6; }
     .wc-x:hover { opacity: 1; }
     label { display: block; margin: 6px 0 2px; font-size: 11px; opacity: .65; }
@@ -146,6 +146,27 @@
     `;
     form.querySelector(".wc-x").addEventListener("click", closeForm);
     form.querySelector(".wc-add").addEventListener("click", () => submit(false));
+
+    // drag the form by its header
+    const head = form.querySelector(".wc-head");
+    head.addEventListener("pointerdown", (e) => {
+      if (e.target.closest(".wc-x")) return;
+      const r = form.getBoundingClientRect();
+      const dx = e.clientX - r.left;
+      const dy = e.clientY - r.top;
+      const move = (ev) => {
+        form.style.left = `${Math.max(0, Math.min(ev.clientX - dx, innerWidth - 60))}px`;
+        form.style.top = `${Math.max(0, Math.min(ev.clientY - dy, innerHeight - 40))}px`;
+      };
+      const up = () => {
+        head.removeEventListener("pointermove", move);
+        head.removeEventListener("pointerup", up);
+      };
+      head.setPointerCapture(e.pointerId);
+      head.addEventListener("pointermove", move);
+      head.addEventListener("pointerup", up);
+      e.preventDefault();
+    });
     form.addEventListener("keydown", (e) => {
       e.stopPropagation(); // keep page hotkeys away from our form
       if (e.key === "Escape") closeForm();
@@ -219,6 +240,7 @@
     const st = await send({ type: "GET_SETTINGS" });
     q(".wc-rev").checked = !!st?.settings?.defaultReverse;
     q(".wc-tr").focus();
+    requestTranslation(cap.word);
 
     const deckSel = q(".wc-deck");
     deckSel.innerHTML = "<option>Загружаю колоды…</option>";
@@ -241,6 +263,19 @@
   function closeForm() {
     form?.classList.remove("show");
     currentCapture = null;
+  }
+
+  // Fill the translation field asynchronously; never overwrite what the
+  // user already typed, and ignore stale responses after a reopen.
+  let translateSeq = 0;
+  async function requestTranslation(word) {
+    const seq = ++translateSeq;
+    const tr = q(".wc-tr");
+    tr.placeholder = "перевожу…";
+    const res = await send({ type: "TRANSLATE", text: word });
+    if (seq !== translateSeq || !formOpen()) return;
+    tr.placeholder = "можно оставить пустым";
+    if (res.ok && !tr.value) tr.value = res.translation;
   }
 
   function setStatus(text, isErr = false, action = null) {
@@ -290,8 +325,11 @@
     const st = await send({ type: "GET_SETTINGS" });
     const deck = st?.settings?.lastDeck;
     if (!deck) { openForm(cap); return; } // first ever use: no deck yet — fall back to form
+    let translation = "";
+    const tr = await send({ type: "TRANSLATE", text: cap.word });
+    if (tr.ok) translation = tr.translation;
     const note = {
-      word: cap.word, translation: "", context: cap.context, source: cap.source,
+      word: cap.word, translation, context: cap.context, source: cap.source,
       reverse: !!st.settings.defaultReverse, deck, allowDuplicate,
     };
     const res = await send({ type: "ADD_NOTE", note });

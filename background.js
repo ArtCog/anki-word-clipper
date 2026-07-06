@@ -1,11 +1,14 @@
 // All AnkiConnect HTTP + settings live here. Chrome runs this as a service
 // worker (importScripts below); Firefox loads manifest background.scripts
 // ["anki-client.js", "background.js"] in order, so AnkiClient already exists.
-if (typeof importScripts === "function") importScripts("anki-client.js");
+if (typeof importScripts === "function") importScripts("anki-client.js", "translator.js");
 
 const api = globalThis.browser ?? globalThis.chrome;
 const ANKI_URL = "http://127.0.0.1:8765";
-const DEFAULT_SETTINGS = { lastDeck: null, instantMode: false, defaultReverse: false };
+const DEFAULT_SETTINGS = {
+  lastDeck: null, instantMode: false, defaultReverse: false,
+  autoTranslate: true, targetLang: "ru", deeplKey: "",
+};
 
 let modelReady = false;
 
@@ -95,11 +98,46 @@ async function addNote(note) {
   }
 }
 
+async function fetchWithTimeout(url, options = {}, ms = 5000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Translation is a convenience: any failure returns ok:false and the caller
+// proceeds with an empty translation instead of blocking the card.
+async function translate(text) {
+  const s = await getSettings();
+  if (!s.autoTranslate || !text?.trim()) return { ok: false, code: "DISABLED", message: "" };
+  try {
+    if (s.deeplKey?.trim()) {
+      const req = Translator.buildDeepLRequest(text, s.targetLang, s.deeplKey);
+      const res = await fetchWithTimeout(req.url, req.options);
+      if (!res.ok) throw new Error(`DeepL HTTP ${res.status}`);
+      const t = Translator.parseDeepLResponse(await res.json());
+      if (t) return { ok: true, translation: t, provider: "deepl" };
+      throw new Error("DeepL: пустой ответ");
+    }
+    const res = await fetchWithTimeout(Translator.buildGoogleUrl(text, s.targetLang));
+    if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
+    const t = Translator.parseGoogleResponse(await res.json());
+    if (t) return { ok: true, translation: t, provider: "google" };
+    throw new Error("Google: пустой ответ");
+  } catch (e) {
+    return { ok: false, code: "TRANSLATE_FAILED", message: String(e?.message ?? e) };
+  }
+}
+
 async function handleMessage(msg) {
   switch (msg?.type) {
     case "CHECK_CONNECTION": return check();
     case "GET_DECKS": return getDecks();
     case "ADD_NOTE": return addNote(msg.note);
+    case "TRANSLATE": return translate(msg.text);
     case "GET_SETTINGS": return { ok: true, settings: await getSettings() };
     case "SET_SETTINGS": await patchSettings(msg.patch ?? {}); return { ok: true };
     default: return { ok: false, code: "UNKNOWN", message: `Unknown message: ${msg?.type}` };

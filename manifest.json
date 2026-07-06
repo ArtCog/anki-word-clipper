@@ -4,10 +4,15 @@
   "version": "0.1.0",
   "description": "Быстро добавляет выделенное слово с контекстом предложения в Anki через AnkiConnect. Работает только локально.",
   "permissions": ["storage", "contextMenus", "activeTab"],
-  "host_permissions": ["http://127.0.0.1:8765/*"],
+  "host_permissions": [
+    "http://127.0.0.1:8765/*",
+    "https://translate.googleapis.com/*",
+    "https://api-free.deepl.com/*",
+    "https://api.deepl.com/*"
+  ],
   "background": {
     "service_worker": "background.js",
-    "scripts": ["anki-client.js", "background.js"]
+    "scripts": ["anki-client.js", "translator.js", "background.js"]
   },
   "content_scripts": [
     {

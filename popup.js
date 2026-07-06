@@ -17,10 +17,16 @@ async function init() {
   const s = res?.settings ?? {};
   $("instant").checked = !!s.instantMode;
   $("reverse").checked = !!s.defaultReverse;
+  $("autotr").checked = !!s.autoTranslate;
+  $("deeplkey").value = s.deeplKey ?? "";
   $("instant").addEventListener("change", () =>
     api.runtime.sendMessage({ type: "SET_SETTINGS", patch: { instantMode: $("instant").checked } }));
   $("reverse").addEventListener("change", () =>
     api.runtime.sendMessage({ type: "SET_SETTINGS", patch: { defaultReverse: $("reverse").checked } }));
+  $("autotr").addEventListener("change", () =>
+    api.runtime.sendMessage({ type: "SET_SETTINGS", patch: { autoTranslate: $("autotr").checked } }));
+  $("deeplkey").addEventListener("change", () =>
+    api.runtime.sendMessage({ type: "SET_SETTINGS", patch: { deeplKey: $("deeplkey").value.trim() } }));
   $("retry").addEventListener("click", check);
   check();
 }
