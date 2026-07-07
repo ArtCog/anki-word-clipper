@@ -39,9 +39,10 @@
     .wc-btn.show { display: block; }
     .wc-btn:hover { background: #16211d; }
     .wc-form {
-      position: fixed; display: none; z-index: 2147483647; width: 320px;
-      background: #0B0F0E; color: #E8EDEB; border: 1px solid #2a3733; border-radius: 12px;
-      padding: 12px; font-size: 13px; box-shadow: 0 6px 30px rgba(0,0,0,.5);
+      position: fixed; display: none; z-index: 2147483647; width: 324px;
+      background: #0d1211; color: #E8EDEB; border: 1px solid #24312c; border-top: 2px solid #3CE5B0;
+      border-radius: 14px; padding: 14px; font-size: 13px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.55);
     }
     .wc-form.show { display: block; }
     .wc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; color: #3CE5B0; font-weight: 700; cursor: move; user-select: none; touch-action: none; }
@@ -49,18 +50,19 @@
     .wc-x:hover { opacity: 1; }
     label { display: block; margin: 6px 0 2px; font-size: 11px; opacity: .65; }
     input[type=text], textarea, select {
-      width: 100%; background: #16211d; color: #E8EDEB; border: 1px solid #2a3733;
-      border-radius: 7px; padding: 6px 8px; font-size: 13px;
+      width: 100%; background: #16211d; color: #E8EDEB; border: 1px solid #26332e;
+      border-radius: 8px; padding: 7px 9px; font-size: 13px; transition: border-color .12s;
     }
-    textarea { resize: vertical; min-height: 44px; }
-    input:focus, textarea:focus, select:focus { outline: 1px solid #3CE5B0; }
+    textarea { resize: vertical; min-height: 44px; transition: height .12s; }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: #3CE5B0; }
     .wc-rev-row { display: flex; gap: 7px; align-items: center; margin-top: 8px; font-size: 12px; opacity: .9; }
     .wc-rev-row label { all: unset; cursor: pointer; font-size: 12px; }
     .wc-row { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
     .wc-add {
-      background: #3CE5B0; color: #0B0F0E; border: 0; border-radius: 7px;
-      padding: 6px 14px; font-weight: 700; cursor: pointer;
+      background: #3CE5B0; color: #0B0F0E; border: 0; border-radius: 8px;
+      padding: 7px 16px; font-weight: 700; cursor: pointer;
     }
+    .wc-add:hover { filter: brightness(1.08); }
     .wc-add:disabled { opacity: .5; cursor: default; }
     .wc-status { font-size: 12px; opacity: .85; }
     .wc-status.err { color: #ff8a8a; }
@@ -159,6 +161,25 @@
     form.querySelector(".wc-x").addEventListener("click", closeForm);
     form.querySelector(".wc-add").addEventListener("click", () => submit(false));
 
+    // re-translate when the word is edited by hand; stop auto-filling once
+    // the user typed their own translation
+    const wordInput = form.querySelector(".wc-word");
+    const trInput = form.querySelector(".wc-tr");
+    let wordTimer;
+    trInput.addEventListener("input", () => { trEdited = true; });
+    wordInput.addEventListener("input", () => {
+      clearTimeout(wordTimer);
+      wordTimer = setTimeout(() => { if (!trEdited) requestTranslation(wordInput.value); }, 600);
+    });
+
+    // context textarea grows to its content while focused
+    const ctxInput = form.querySelector(".wc-ctx");
+    ctxInput.addEventListener("focus", () => {
+      ctxInput.style.height = "auto";
+      ctxInput.style.height = `${Math.min(ctxInput.scrollHeight + 2, 180)}px`;
+    });
+    ctxInput.addEventListener("blur", () => { ctxInput.style.height = ""; });
+
     // drag the form by its header
     const head = form.querySelector(".wc-head");
     head.addEventListener("pointerdown", (e) => {
@@ -223,6 +244,10 @@
     const sel = window.getSelection();
     if ((!sel || sel.isCollapsed) && !formOpen()) hideButton();
   });
+  // click anywhere outside the form closes it
+  document.addEventListener("mousedown", (e) => {
+    if (formOpen() && !e.composedPath().includes(host)) closeForm();
+  }, true);
   window.addEventListener("scroll", hideButton, { passive: true, capture: true });
 
   async function onButton(e) {
@@ -239,6 +264,7 @@
     if (!cap) return;
     ensureUi();
     currentCapture = cap;
+    trEdited = false;
     q(".wc-word").value = cap.word;
     q(".wc-tr").value = "";
     q(".wc-ctx").value = cap.context;
@@ -280,14 +306,16 @@
   // Fill the translation field asynchronously; never overwrite what the
   // user already typed, and ignore stale responses after a reopen.
   let translateSeq = 0;
+  let trEdited = false; // user typed their own translation — never overwrite it
   async function requestTranslation(word) {
+    if (!word?.trim()) return;
     const seq = ++translateSeq;
     const tr = q(".wc-tr");
     tr.placeholder = "перевожу…";
     const res = await send({ type: "TRANSLATE", text: word });
     if (seq !== translateSeq || !formOpen()) return;
     tr.placeholder = "можно оставить пустым";
-    if (res.ok && !tr.value) tr.value = res.translation;
+    if (res.ok && !trEdited) tr.value = res.translation;
   }
 
   function setStatus(text, isErr = false, action = null) {
