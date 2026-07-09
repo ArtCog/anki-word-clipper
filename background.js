@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS = {
   autoTranslate: true, targetLang: "ru",
   engine: "google",                   // "google" | "deepl" | "ai" — сhosen translation engine
   deeplKey: "",
-  aiBaseUrl: "", aiModel: "", aiKey: "",
+  aiBaseUrl: "", aiModel: "", aiKey: "", aiExtra: "",
   ttsLang: "off",                     // Anki tts lang tag: "off" | "de_DE" | "en_US" | …
   modelTtsLang: null,                 // internal: tts lang the main model was built with
 };
@@ -154,7 +154,7 @@ const aiConfigured = (s) => s.aiBaseUrl?.trim() && s.aiModel?.trim();
 // translation + short grammar note. Never throws — failures bubble up so the
 // caller can fall back to a plain translator.
 async function aiTranslate(s, text, context) {
-  const req = Translator.buildAiRequest(s.aiBaseUrl, s.aiModel, s.aiKey, text, context ?? "", s.targetLang);
+  const req = Translator.buildAiRequest(s.aiBaseUrl, s.aiModel, s.aiKey, text, context ?? "", s.targetLang, s.aiExtra);
   const res = await fetchWithTimeout(req.url, req.options, 20000);
   if (!res.ok) throw new Error(`AI HTTP ${res.status}`);
   const out = Translator.parseAiResponse(await res.json());

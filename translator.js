@@ -39,21 +39,28 @@ function parseDeepLResponse(json) {
 // local Ollama — all speak the same /chat/completions shape.
 
 const AI_SYSTEM_PROMPT =
-  "You are a bilingual dictionary for language learners. Given a WORD as it " +
+  "You are a bilingual dictionary for language learners. Given a WORD or PHRASE as it " +
   "appears in a sentence, return STRICT JSON (no prose, no code fence) with keys: " +
-  '"headword" (dictionary/base form; for German nouns include article and plural, ' +
-  'e.g. "das Haus, die Häuser"; empty string if not applicable), ' +
-  '"translation" (concise translation into the target language, meaning IN THIS CONTEXT), ' +
-  '"note" (very short grammatical hint: part of speech, gender, irregular forms; may be empty). ' +
+  '"headword" — the dictionary form: ' +
+  'German nouns → article + plural (e.g. "das Haus, die Häuser"); ' +
+  'German verbs → the three principal forms with auxiliary (e.g. "gehen, ging, ist gegangen"); ' +
+  'English irregular verbs → base, past, past participle (e.g. "go, went, gone"); ' +
+  "other words → plain base form; empty string if not applicable. " +
+  '"translation" — concise translation into the target language, the meaning IN THIS CONTEXT. ' +
+  '"note" — very short grammar hint (part of speech, gender, separable prefix, case government, irregularity); may be empty. ' +
   "Keep it compact. Never add commentary.";
 
-function buildAiRequest(baseUrl, model, apiKey, word, context, targetLang) {
+function buildAiRequest(baseUrl, model, apiKey, word, context, targetLang, extraInstructions) {
   const base = String(baseUrl).replace(/\/+$/, "");
   const headers = { "Content-Type": "application/json" };
   const key = String(apiKey ?? "").trim();
   if (key) headers.Authorization = `Bearer ${key}`;
+  const extra = String(extraInstructions ?? "").trim();
+  const sys = extra
+    ? `${AI_SYSTEM_PROMPT}\nAdditional user instructions (they win over the defaults above): ${extra}`
+    : AI_SYSTEM_PROMPT;
   const userMsg =
-    `Target language: ${targetLang}\nWord: ${word}\n` +
+    `Target language: ${targetLang}\nWord or phrase: ${word}\n` +
     (context ? `Sentence: ${context}` : "Sentence: (none)");
   return {
     url: `${base}/chat/completions`,
@@ -64,7 +71,7 @@ function buildAiRequest(baseUrl, model, apiKey, word, context, targetLang) {
         model,
         temperature: 0,
         messages: [
-          { role: "system", content: AI_SYSTEM_PROMPT },
+          { role: "system", content: sys },
           { role: "user", content: userMsg },
         ],
       }),

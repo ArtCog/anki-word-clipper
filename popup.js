@@ -71,6 +71,7 @@ async function init() {
   $("aiurl").value = s.aiBaseUrl ?? "";
   $("aimodel").value = s.aiModel ?? "";
   $("aikey").value = s.aiKey ?? "";
+  $("aiextra").value = s.aiExtra ?? "";
 
   // restore preset selection + key link from the saved base URL
   const presetName = Object.keys(AI_PRESETS).find((k) => AI_PRESETS[k].url && AI_PRESETS[k].url === s.aiBaseUrl);
@@ -107,6 +108,7 @@ async function init() {
   $("aiurl").addEventListener("change", () => set({ aiBaseUrl: $("aiurl").value.trim() }));
   $("aimodel").addEventListener("change", () => set({ aiModel: $("aimodel").value.trim() }));
   $("aikey").addEventListener("change", () => set({ aiKey: $("aikey").value.trim() }));
+  $("aiextra").addEventListener("change", () => set({ aiExtra: $("aiextra").value.trim() }));
   $("aitest").addEventListener("click", testAi);
 
   $("retry").addEventListener("click", check);

@@ -65,3 +65,13 @@ test("parseAiResponse parses plain and fenced JSON", () => {
   assert.equal(T.parseAiResponse(wrap('{"headword":"x","note":"y"}')), null); // no translation
   assert.equal(T.parseAiResponse(null), null);
 });
+
+test("system prompt teaches verb principal forms; extra instructions are appended", () => {
+  const r = T.buildAiRequest("https://x/v1", "m", "k", "ging", "Er ging heim.", "ru");
+  const sys = JSON.parse(r.options.body).messages[0].content;
+  assert.ok(sys.includes("gehen, ging, ist gegangen"));
+  assert.ok(sys.includes("go, went, gone"));
+  const r2 = T.buildAiRequest("https://x/v1", "m", "k", "w", "", "ru", "always add IPA");
+  const sys2 = JSON.parse(r2.options.body).messages[0].content;
+  assert.ok(sys2.includes("always add IPA"));
+});

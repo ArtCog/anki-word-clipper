@@ -37,8 +37,8 @@
 
   label.check { display: flex; gap: 7px; align-items: center; margin: 8px 0; cursor: pointer; }
   .field { display: block; font-size: 11px; opacity: .85; margin: 9px 0 0; }
-  .field input, .field select { width: 100%; margin-top: 3px; background: #16211d; color: #E8EDEB; border: 1px solid #2a3733; border-radius: 7px; padding: 6px 8px; font-size: 12px; box-sizing: border-box; }
-  .field input:focus, .field select:focus { outline: none; border-color: #3CE5B0; }
+  .field input, .field select, .field textarea { width: 100%; margin-top: 3px; background: #16211d; color: #E8EDEB; border: 1px solid #2a3733; border-radius: 7px; padding: 6px 8px; font-size: 12px; box-sizing: border-box; font-family: inherit; resize: vertical; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #3CE5B0; }
 
   .keylink { display: inline-block; font-size: 11px; margin-top: 5px; }
   .keylink[hidden] { display: none; }
@@ -129,6 +129,9 @@
             <input type="text" id="aikey" placeholder="ключ провайдера">
           </label>
           <a id="aikeylink" class="keylink" href="#" target="_blank" rel="noopener" hidden>Получить ключ бесплатно →</a>
+          <label class="field">Свои инструкции для ИИ (опционально)
+            <textarea id="aiextra" rows="2" placeholder="напр.: к глаголам добавляй пример в Präsens"></textarea>
+          </label>
           <button id="aitest" class="ghost">Проверить ИИ</button>
           <div id="aitest-res"></div>
         </div>
