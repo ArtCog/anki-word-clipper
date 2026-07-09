@@ -20,7 +20,9 @@
   .field input, .field select { width: 100%; margin-top: 3px; background: #16211d; color: #E8EDEB; border: 1px solid #2a3733; border-radius: 7px; padding: 6px 8px; font-size: 12px; box-sizing: border-box; }
   .field input:focus, .field select:focus { outline: none; border-color: #3CE5B0; }
   .ai-body[hidden] { display: none; }
-  #aitest { margin-top: 8px; }
+  .keylink { display: inline-block; font-size: 11px; margin-top: 5px; }
+  .keylink[hidden] { display: none; }
+  #aitest { display: block; margin-top: 10px; }
   #aitest-res { font-size: 11px; margin-top: 6px; min-height: 0; }
   #aitest-res.ok { color: #7bdcc0; }
   #aitest-res.err { color: #ff8a8a; }
@@ -86,6 +88,7 @@
     <label class="field">API-ключ (Ollama — оставь пустым)
       <input type="text" id="aikey" placeholder="ключ провайдера">
     </label>
+    <a id="aikeylink" class="keylink" href="#" target="_blank" rel="noopener" hidden>Получить ключ бесплатно →</a>
     <button id="aitest" class="ghost">Проверить ИИ</button>
     <div id="aitest-res"></div>
   </div>

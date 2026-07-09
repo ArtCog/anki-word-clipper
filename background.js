@@ -89,9 +89,15 @@ async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...(st.settings ?? {}) };
 }
 
-async function patchSettings(patch) {
-  const s = await getSettings();
-  await api.storage.local.set({ settings: { ...s, ...patch } });
+// Serialized read-modify-write: concurrent patches (popup preset writes two
+// fields back-to-back) must not overwrite each other.
+let settingsQueue = Promise.resolve();
+function patchSettings(patch) {
+  settingsQueue = settingsQueue.then(async () => {
+    const s = await getSettings();
+    await api.storage.local.set({ settings: { ...s, ...patch } });
+  });
+  return settingsQueue;
 }
 
 async function getDecks() {
@@ -186,12 +192,23 @@ async function translate(text, context) {
 // Popup "Проверить AI" button: surface the real error to the user.
 async function testAi() {
   const s = await getSettings();
-  if (!aiConfigured(s)) return { ok: false, message: "Укажи URL, модель и (если нужно) ключ." };
+  if (!s.aiBaseUrl?.trim() || !s.aiModel?.trim()) {
+    return { ok: false, message: "Выбери провайдера из списка — URL и модель заполнятся сами." };
+  }
+  const isLocal = /localhost|127\.0\.0\.1/.test(s.aiBaseUrl);
+  if (!s.aiKey?.trim() && !isLocal) {
+    return { ok: false, message: "Вставь API-ключ (ссылка «Получить ключ» под полем)." };
+  }
   try {
     const r = await aiTranslate(s, "Haus", "Das Haus ist groß.");
     return { ok: true, sample: r };
   } catch (e) {
-    return { ok: false, message: String(e?.message ?? e) };
+    const m = String(e?.message ?? e);
+    const status = m.match(/HTTP (\d+)/)?.[1];
+    if (status === "401" || status === "403") return { ok: false, message: "Провайдер не принял ключ — проверь его (или получи новый)." };
+    if (status === "404") return { ok: false, message: "Модель не найдена — проверь её имя у провайдера." };
+    if (status === "429") return { ok: false, message: "Лимит запросов провайдера — подожди минуту и повтори." };
+    return { ok: false, message: m };
   }
 }
 

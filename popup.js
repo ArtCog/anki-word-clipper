@@ -4,11 +4,23 @@ const set = (patch) => api.runtime.sendMessage({ type: "SET_SETTINGS", patch });
 
 // preset → base URL + a sensible default model (user can override)
 const AI_PRESETS = {
-  gemini: { url: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-2.0-flash" },
-  openrouter: { url: "https://openrouter.ai/api/v1", model: "google/gemini-2.0-flash-exp:free" },
-  openai: { url: "https://api.openai.com/v1", model: "gpt-4o-mini" },
-  ollama: { url: "http://localhost:11434/v1", model: "llama3.1" },
-  custom: { url: "", model: "" },
+  gemini: {
+    url: "https://generativelanguage.googleapis.com/v1beta/openai",
+    model: "gemini-2.5-flash",
+    keyUrl: "https://aistudio.google.com/apikey",
+  },
+  openrouter: {
+    url: "https://openrouter.ai/api/v1",
+    model: "google/gemini-2.5-flash",
+    keyUrl: "https://openrouter.ai/settings/keys",
+  },
+  openai: {
+    url: "https://api.openai.com/v1",
+    model: "gpt-4o-mini",
+    keyUrl: "https://platform.openai.com/api-keys",
+  },
+  ollama: { url: "http://localhost:11434/v1", model: "llama3.1", keyUrl: null },
+  custom: { url: "", model: "", keyUrl: null },
 };
 
 async function check() {
@@ -52,6 +64,14 @@ async function init() {
   $("aikey").value = s.aiKey ?? "";
   $("aibody").hidden = !s.aiEnabled;
 
+  // restore preset selection + key link from the saved base URL
+  const presetName = Object.keys(AI_PRESETS).find((k) => AI_PRESETS[k].url && AI_PRESETS[k].url === s.aiBaseUrl);
+  if (presetName) {
+    $("aipreset").value = presetName;
+    const p = AI_PRESETS[presetName];
+    if (p.keyUrl) { $("aikeylink").hidden = false; $("aikeylink").href = p.keyUrl; }
+  }
+
   $("instant").addEventListener("change", () => set({ instantMode: $("instant").checked }));
   $("cardtype").addEventListener("change", () => set({ defaultCardType: $("cardtype").value }));
   $("ttslang").addEventListener("change", () => set({ ttsLang: $("ttslang").value }));
@@ -65,8 +85,13 @@ async function init() {
   $("aipreset").addEventListener("change", () => {
     const p = AI_PRESETS[$("aipreset").value];
     if (!p) return;
-    if (p.url) { $("aiurl").value = p.url; set({ aiBaseUrl: p.url }); }
-    if (p.model) { $("aimodel").value = p.model; set({ aiModel: p.model }); }
+    $("aiurl").value = p.url;
+    $("aimodel").value = p.model;
+    set({ aiBaseUrl: p.url, aiModel: p.model }); // one atomic patch — no lost update
+    const link = $("aikeylink");
+    link.hidden = !p.keyUrl;
+    if (p.keyUrl) link.href = p.keyUrl;
+    if (p.keyUrl) $("aikey").focus();
   });
   $("aiurl").addEventListener("change", () => set({ aiBaseUrl: $("aiurl").value.trim() }));
   $("aimodel").addEventListener("change", () => set({ aiModel: $("aimodel").value.trim() }));
