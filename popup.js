@@ -79,8 +79,12 @@ async function init() {
   $("deeplkey").addEventListener("change", () => set({ deeplKey: $("deeplkey").value.trim() }));
 
   $("aienabled").addEventListener("change", () => {
-    $("aibody").hidden = !$("aienabled").checked;
-    set({ aiEnabled: $("aienabled").checked });
+    const on = $("aienabled").checked;
+    $("aibody").hidden = !on;
+    // AI is a translation mode — enabling it must also enable translation,
+    // otherwise the master autoTranslate switch silently blocks it
+    if (on && !$("autotr").checked) $("autotr").checked = true;
+    set(on ? { aiEnabled: true, autoTranslate: true } : { aiEnabled: false });
   });
   $("aipreset").addEventListener("change", () => {
     const p = AI_PRESETS[$("aipreset").value];
