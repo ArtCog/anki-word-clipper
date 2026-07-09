@@ -8,8 +8,10 @@ const ANKI_URL = "http://127.0.0.1:8765";
 const DEFAULT_SETTINGS = {
   lastDeck: null, instantMode: false,
   defaultCardType: "basic",           // "basic" | "reverse" | "cloze"
-  autoTranslate: true, targetLang: "ru", deeplKey: "",
-  aiEnabled: false, aiBaseUrl: "", aiModel: "", aiKey: "",
+  autoTranslate: true, targetLang: "ru",
+  engine: "google",                   // "google" | "deepl" | "ai" — сhosen translation engine
+  deeplKey: "",
+  aiBaseUrl: "", aiModel: "", aiKey: "",
   ttsLang: "off",                     // Anki tts lang tag: "off" | "de_DE" | "en_US" | …
   modelTtsLang: null,                 // internal: tts lang the main model was built with
 };
@@ -86,7 +88,13 @@ async function check() {
 
 async function getSettings() {
   const st = await api.storage.local.get("settings");
-  return { ...DEFAULT_SETTINGS, ...(st.settings ?? {}) };
+  const stored = st.settings ?? {};
+  const s = { ...DEFAULT_SETTINGS, ...stored };
+  // migration from pre-"engine" settings (aiEnabled / bare deeplKey)
+  if (!("engine" in stored)) {
+    s.engine = stored.aiEnabled ? "ai" : (stored.deeplKey?.trim() ? "deepl" : "google");
+  }
+  return s;
 }
 
 // Serialized read-modify-write: concurrent patches (popup preset writes two
@@ -140,7 +148,7 @@ async function fetchWithTimeout(url, options = {}, ms = 5000) {
   }
 }
 
-const aiConfigured = (s) => s.aiEnabled && s.aiBaseUrl?.trim() && s.aiModel?.trim();
+const aiConfigured = (s) => s.aiBaseUrl?.trim() && s.aiModel?.trim();
 
 // AI provider: context-aware. Returns dictionary headword + contextual
 // translation + short grammar note. Never throws — failures bubble up so the
@@ -154,15 +162,16 @@ async function aiTranslate(s, text, context) {
   return { ok: true, provider: "ai", ...out }; // {translation, headword, note}
 }
 
-async function plainTranslate(s, text) {
-  if (s.deeplKey?.trim()) {
-    const req = Translator.buildDeepLRequest(text, s.targetLang, s.deeplKey);
-    const res = await fetchWithTimeout(req.url, req.options);
-    if (!res.ok) throw new Error(`DeepL HTTP ${res.status}`);
-    const t = Translator.parseDeepLResponse(await res.json());
-    if (!t) throw new Error("DeepL: пустой ответ");
-    return { ok: true, translation: t, provider: "deepl" };
-  }
+async function deeplTranslate(s, text) {
+  const req = Translator.buildDeepLRequest(text, s.targetLang, s.deeplKey);
+  const res = await fetchWithTimeout(req.url, req.options);
+  if (!res.ok) throw new Error(`DeepL HTTP ${res.status}`);
+  const t = Translator.parseDeepLResponse(await res.json());
+  if (!t) throw new Error("DeepL: пустой ответ");
+  return { ok: true, translation: t, provider: "deepl" };
+}
+
+async function googleTranslate(s, text) {
   const res = await fetchWithTimeout(Translator.buildGoogleUrl(text, s.targetLang));
   if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
   const t = Translator.parseGoogleResponse(await res.json());
@@ -172,18 +181,18 @@ async function plainTranslate(s, text) {
 
 // Translation is a convenience: any failure returns ok:false and the caller
 // proceeds with an empty translation instead of blocking the card.
+// Engine hierarchy: the chosen engine runs first; Google is the safety net.
 async function translate(text, context) {
   const s = await getSettings();
   if (!s.autoTranslate || !text?.trim()) return { ok: false, code: "DISABLED", message: "" };
-  if (aiConfigured(s)) {
-    try {
-      return await aiTranslate(s, text, context);
-    } catch {
-      // fall through to plain translator so the field still fills
-    }
+  try {
+    if (s.engine === "ai" && aiConfigured(s)) return await aiTranslate(s, text, context);
+    if (s.engine === "deepl" && s.deeplKey?.trim()) return await deeplTranslate(s, text);
+  } catch {
+    // chosen engine failed — fall back to Google so the field still fills
   }
   try {
-    return await plainTranslate(s, text);
+    return await googleTranslate(s, text);
   } catch (e) {
     return { ok: false, code: "TRANSLATE_FAILED", message: String(e?.message ?? e) };
   }

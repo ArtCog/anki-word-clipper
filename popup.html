@@ -3,95 +3,140 @@
 <head>
 <meta charset="utf-8">
 <style>
-  body { font: 13px/1.45 "Segoe UI", system-ui, sans-serif; background: #0B0F0E; color: #E8EDEB; width: 320px; margin: 0; padding: 14px; }
+  body { font: 13px/1.45 "Segoe UI", system-ui, sans-serif; background: #0B0F0E; color: #E8EDEB; width: 330px; margin: 0; padding: 14px; }
   h1 { font-size: 14px; margin: 0 0 10px; color: #3CE5B0; }
-  h2 { font-size: 12px; margin: 16px 0 6px; color: #7bdcc0; text-transform: uppercase; letter-spacing: .04em; opacity: .85; }
-  #status { padding: 8px 10px; border-radius: 8px; margin-bottom: 10px; background: #16211d; }
-  #status.ok { border-left: 3px solid #3CE5B0; }
-  #status.err { border-left: 3px solid #e05252; }
+
+  #statusrow { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+  #status { flex: 1; display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 9px; background: #121917; border: 1px solid #1e2a26; }
+  #status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #8a9490; flex: none; }
+  #status.ok::before { background: #3CE5B0; box-shadow: 0 0 6px #3CE5B0aa; }
+  #status.err::before { background: #e05252; }
   #status.checking { opacity: .7; }
-  #help { font-size: 12px; opacity: .85; margin-bottom: 10px; }
+  #retry { background: #16211d; color: #E8EDEB; border: 1px solid #2a3733; border-radius: 9px; width: 34px; height: 34px; cursor: pointer; font-size: 15px; flex: none; }
+  #retry:hover { border-color: #3CE5B0; }
+
+  #help { font-size: 12px; opacity: .85; margin: 0 0 12px; padding: 10px 12px; background: #101615; border: 1px solid #1e2a26; border-radius: 10px; }
   #help p { margin: 4px 0; }
+
+  details.sec { background: #101615; border: 1px solid #1e2a26; border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+  details.sec summary {
+    list-style: none; cursor: pointer; user-select: none; padding: 10px 12px;
+    font-size: 12px; font-weight: 600; color: #7bdcc0; text-transform: uppercase; letter-spacing: .04em;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  details.sec summary::-webkit-details-marker { display: none; }
+  details.sec summary::after { content: "▸"; color: #3a4a44; transition: transform .15s; }
+  details.sec[open] summary::after { transform: rotate(90deg); }
+  details.sec summary:hover { background: #141d1a; }
+  .sec-body { padding: 2px 12px 12px; }
+
   button { background: #3CE5B0; color: #0B0F0E; border: 0; border-radius: 7px; padding: 6px 12px; font-weight: 600; cursor: pointer; }
   button:hover { filter: brightness(1.1); }
   button.ghost { background: #16211d; color: #E8EDEB; border: 1px solid #2a3733; font-weight: 500; }
+  button.ghost:hover { border-color: #3CE5B0; filter: none; }
+
   label.check { display: flex; gap: 7px; align-items: center; margin: 8px 0; cursor: pointer; }
   .field { display: block; font-size: 11px; opacity: .85; margin: 9px 0 0; }
   .field input, .field select { width: 100%; margin-top: 3px; background: #16211d; color: #E8EDEB; border: 1px solid #2a3733; border-radius: 7px; padding: 6px 8px; font-size: 12px; box-sizing: border-box; }
   .field input:focus, .field select:focus { outline: none; border-color: #3CE5B0; }
-  .ai-body[hidden] { display: none; }
+
   .keylink { display: inline-block; font-size: 11px; margin-top: 5px; }
   .keylink[hidden] { display: none; }
   #aitest { display: block; margin-top: 10px; }
-  #aitest-res { font-size: 11px; margin-top: 6px; min-height: 0; }
+  #aitest-res { font-size: 11px; margin-top: 6px; }
   #aitest-res.ok { color: #7bdcc0; }
   #aitest-res.err { color: #ff8a8a; }
-  .hint { font-size: 11px; opacity: .55; margin: 14px 0 0; }
+  .subnote { font-size: 11px; opacity: .5; margin: 8px 0 0; }
+  .hint { font-size: 11px; opacity: .55; margin: 12px 0 0; }
   a { color: #3CE5B0; }
 </style>
 </head>
 <body>
   <h1>Anki Word Clipper</h1>
-  <div id="status" class="checking">Проверяю соединение…</div>
+
+  <div id="statusrow">
+    <div id="status" class="checking">Проверяю соединение…</div>
+    <button id="retry" title="Проверить снова">⟳</button>
+  </div>
   <div id="help" hidden>
     <p>1. Запусти Anki Desktop.</p>
     <p>2. Установи аддон AnkiConnect: Tools → Add-ons → Get Add-ons → код <b>2055492159</b>, перезапусти Anki.</p>
-    <p>3. Нажми «Проверить снова» и разреши доступ в диалоге Anki.</p>
+    <p>3. Нажми ⟳ и разреши доступ в диалоге Anki.</p>
   </div>
-  <button id="retry" class="ghost">Проверить снова</button>
 
-  <h2>Карточки</h2>
-  <label class="check"><input type="checkbox" id="instant"> Мгновенный режим (Shift+клик — форма)</label>
-  <label class="field">Тип карточки по умолчанию
-    <select id="cardtype">
-      <option value="basic">Обычная (слово → перевод)</option>
-      <option value="reverse">Двусторонняя (+ перевод → слово)</option>
-      <option value="cloze">Пропуск в предложении (cloze)</option>
-    </select>
-  </label>
-  <label class="field">Озвучка слова на карточке (Anki TTS)
-    <select id="ttslang">
-      <option value="off">выключена</option>
-      <option value="de_DE">немецкий (de_DE)</option>
-      <option value="en_US">английский (en_US)</option>
-      <option value="fr_FR">французский (fr_FR)</option>
-      <option value="es_ES">испанский (es_ES)</option>
-      <option value="it_IT">итальянский (it_IT)</option>
-    </select>
-  </label>
+  <details class="sec" id="sec-cards">
+    <summary>Карточки</summary>
+    <div class="sec-body">
+      <label class="check"><input type="checkbox" id="instant"> Мгновенный режим (Shift+клик — форма)</label>
+      <label class="field">Тип карточки по умолчанию
+        <select id="cardtype">
+          <option value="basic">Обычная (слово → перевод)</option>
+          <option value="reverse">Двусторонняя (+ перевод → слово)</option>
+          <option value="cloze">Пропуск в предложении (cloze)</option>
+        </select>
+      </label>
+      <label class="field">Озвучка слова на карточке (Anki TTS)
+        <select id="ttslang">
+          <option value="off">выключена</option>
+          <option value="de_DE">немецкий (de_DE)</option>
+          <option value="en_US">английский (en_US)</option>
+          <option value="fr_FR">французский (fr_FR)</option>
+          <option value="es_ES">испанский (es_ES)</option>
+          <option value="it_IT">итальянский (it_IT)</option>
+        </select>
+      </label>
+    </div>
+  </details>
 
-  <h2>Перевод</h2>
-  <label class="check"><input type="checkbox" id="autotr"> Автоперевод слова</label>
-  <label class="field">DeepL API-ключ — не обязательно; без AI и без него переводит Google
-    <input type="text" id="deeplkey" placeholder="ключ вида xxxx…:fx (Free)">
-  </label>
+  <details class="sec" id="sec-tr">
+    <summary>Перевод</summary>
+    <div class="sec-body">
+      <label class="check"><input type="checkbox" id="autotr"> Автоперевод выделенного слова</label>
+      <div id="engines">
+        <label class="field">Движок перевода
+          <select id="engine">
+            <option value="google">Google — из коробки, без настройки</option>
+            <option value="deepl">DeepL — качественнее, нужен бесплатный ключ</option>
+            <option value="ai">ИИ — перевод по контексту + словарная форма</option>
+          </select>
+        </label>
 
-  <h2>ИИ-режим (перевод по контексту + словарная форма)</h2>
-  <label class="check"><input type="checkbox" id="aienabled"> Включить ИИ-обогащение</label>
-  <div class="ai-body" id="aibody">
-    <label class="field">Провайдер
-      <select id="aipreset">
-        <option value="">— выбрать пресет —</option>
-        <option value="gemini">Google Gemini (бесплатный ключ)</option>
-        <option value="openrouter">OpenRouter</option>
-        <option value="openai">OpenAI</option>
-        <option value="ollama">Ollama (локально, без ключа)</option>
-        <option value="custom">Свой (OpenAI-совместимый)</option>
-      </select>
-    </label>
-    <label class="field">Base URL
-      <input type="text" id="aiurl" placeholder="https://…/v1">
-    </label>
-    <label class="field">Модель
-      <input type="text" id="aimodel" placeholder="напр. gemini-2.0-flash">
-    </label>
-    <label class="field">API-ключ (Ollama — оставь пустым)
-      <input type="text" id="aikey" placeholder="ключ провайдера">
-    </label>
-    <a id="aikeylink" class="keylink" href="#" target="_blank" rel="noopener" hidden>Получить ключ бесплатно →</a>
-    <button id="aitest" class="ghost">Проверить ИИ</button>
-    <div id="aitest-res"></div>
-  </div>
+        <div id="eng-deepl" hidden>
+          <label class="field">DeepL API-ключ
+            <input type="text" id="deeplkey" placeholder="ключ вида xxxx…:fx (Free)">
+          </label>
+          <a class="keylink" href="https://www.deepl.com/pro-api" target="_blank" rel="noopener">Получить ключ бесплатно →</a>
+        </div>
+
+        <div id="eng-ai" hidden>
+          <label class="field">Провайдер
+            <select id="aipreset">
+              <option value="">— выбрать пресет —</option>
+              <option value="gemini">Google Gemini (бесплатный ключ)</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="openai">OpenAI</option>
+              <option value="ollama">Ollama (локально, без ключа)</option>
+              <option value="custom">Свой (OpenAI-совместимый)</option>
+            </select>
+          </label>
+          <label class="field">Base URL
+            <input type="text" id="aiurl" placeholder="https://…/v1">
+          </label>
+          <label class="field">Модель
+            <input type="text" id="aimodel" placeholder="напр. gemini-2.5-flash">
+          </label>
+          <label class="field">API-ключ (Ollama — оставь пустым)
+            <input type="text" id="aikey" placeholder="ключ провайдера">
+          </label>
+          <a id="aikeylink" class="keylink" href="#" target="_blank" rel="noopener" hidden>Получить ключ бесплатно →</a>
+          <button id="aitest" class="ghost">Проверить ИИ</button>
+          <div id="aitest-res"></div>
+        </div>
+
+        <p class="subnote">Если выбранный движок не ответит — слово переведёт Google.</p>
+      </div>
+    </div>
+  </details>
 
   <p class="hint">Выдели текст → кнопка «+ Anki». Или ПКМ → «Добавить в Anki». Hotkey: Alt+A.</p>
   <script src="popup.js"></script>

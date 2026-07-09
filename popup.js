@@ -23,6 +23,11 @@ const AI_PRESETS = {
   custom: { url: "", model: "", keyUrl: null },
 };
 
+function showEngine(engine) {
+  $("eng-deepl").hidden = engine !== "deepl";
+  $("eng-ai").hidden = engine !== "ai";
+}
+
 async function check() {
   const box = $("status");
   box.className = "checking";
@@ -30,7 +35,7 @@ async function check() {
   const res = await api.runtime.sendMessage({ type: "CHECK_CONNECTION" }).catch(() => null);
   const ok = !!res?.ok;
   box.className = ok ? "ok" : "err";
-  box.textContent = ok ? "Anki подключён ✓" : (res?.message ?? "Anki недоступен");
+  box.textContent = ok ? "Anki подключён" : (res?.message ?? "Anki недоступен");
   $("help").hidden = ok;
 }
 
@@ -56,13 +61,16 @@ async function init() {
   $("instant").checked = !!s.instantMode;
   $("cardtype").value = s.defaultCardType ?? "basic";
   $("ttslang").value = s.ttsLang ?? "off";
+
   $("autotr").checked = s.autoTranslate !== false;
+  $("engines").hidden = !$("autotr").checked;
+  $("engine").value = s.engine ?? "google";
+  showEngine($("engine").value);
+
   $("deeplkey").value = s.deeplKey ?? "";
-  $("aienabled").checked = !!s.aiEnabled;
   $("aiurl").value = s.aiBaseUrl ?? "";
   $("aimodel").value = s.aiModel ?? "";
   $("aikey").value = s.aiKey ?? "";
-  $("aibody").hidden = !s.aiEnabled;
 
   // restore preset selection + key link from the saved base URL
   const presetName = Object.keys(AI_PRESETS).find((k) => AI_PRESETS[k].url && AI_PRESETS[k].url === s.aiBaseUrl);
@@ -75,17 +83,17 @@ async function init() {
   $("instant").addEventListener("change", () => set({ instantMode: $("instant").checked }));
   $("cardtype").addEventListener("change", () => set({ defaultCardType: $("cardtype").value }));
   $("ttslang").addEventListener("change", () => set({ ttsLang: $("ttslang").value }));
-  $("autotr").addEventListener("change", () => set({ autoTranslate: $("autotr").checked }));
-  $("deeplkey").addEventListener("change", () => set({ deeplKey: $("deeplkey").value.trim() }));
 
-  $("aienabled").addEventListener("change", () => {
-    const on = $("aienabled").checked;
-    $("aibody").hidden = !on;
-    // AI is a translation mode — enabling it must also enable translation,
-    // otherwise the master autoTranslate switch silently blocks it
-    if (on && !$("autotr").checked) $("autotr").checked = true;
-    set(on ? { aiEnabled: true, autoTranslate: true } : { aiEnabled: false });
+  $("autotr").addEventListener("change", () => {
+    $("engines").hidden = !$("autotr").checked;
+    set({ autoTranslate: $("autotr").checked });
   });
+  $("engine").addEventListener("change", () => {
+    showEngine($("engine").value);
+    set({ engine: $("engine").value });
+  });
+
+  $("deeplkey").addEventListener("change", () => set({ deeplKey: $("deeplkey").value.trim() }));
   $("aipreset").addEventListener("change", () => {
     const p = AI_PRESETS[$("aipreset").value];
     if (!p) return;
@@ -94,8 +102,7 @@ async function init() {
     set({ aiBaseUrl: p.url, aiModel: p.model }); // one atomic patch — no lost update
     const link = $("aikeylink");
     link.hidden = !p.keyUrl;
-    if (p.keyUrl) link.href = p.keyUrl;
-    if (p.keyUrl) $("aikey").focus();
+    if (p.keyUrl) { link.href = p.keyUrl; $("aikey").focus(); }
   });
   $("aiurl").addEventListener("change", () => set({ aiBaseUrl: $("aiurl").value.trim() }));
   $("aimodel").addEventListener("change", () => set({ aiModel: $("aimodel").value.trim() }));
