@@ -13,7 +13,8 @@
 ### 2. Расширение — Chrome / Edge / Brave
 
 1. `chrome://extensions` → включи **Developer mode**.
-2. **Load unpacked** → выбери папку этого репозитория.
+2. Скачай ZIP из [Releases](https://github.com/ArtCog/anki-word-clipper/releases) и распакуй в постоянную папку (или клонируй репозиторий).
+3. **Load unpacked** → выбери эту папку.
 3. Предупреждения про `background.scripts` и `browser_specific_settings` — норма (это ключи для Firefox), Chrome их просто игнорирует.
 
 ### 3. Расширение — Firefox
