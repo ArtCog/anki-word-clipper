@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Anki Word Clipper — настройка</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font: 15px/1.6 "Segoe UI", system-ui, sans-serif; background: #0B0F0E; color: #E8EDEB; margin: 0; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 48px 24px 80px; }
+  h1 { color: #3CE5B0; font-size: 26px; margin: 0 0 6px; }
+  .sub { opacity: .7; margin: 0 0 32px; }
+  ol { list-style: none; counter-reset: step; padding: 0; margin: 0; }
+  li { counter-increment: step; position: relative; padding: 18px 18px 18px 60px; margin-bottom: 14px;
+       background: #101615; border: 1px solid #1e2a26; border-radius: 12px; }
+  li::before { content: counter(step); position: absolute; left: 16px; top: 18px; width: 30px; height: 30px;
+       background: #3CE5B0; color: #0B0F0E; border-radius: 50%; display: grid; place-items: center; font-weight: 700; }
+  li h3 { margin: 0 0 4px; font-size: 16px; }
+  li p { margin: 4px 0; opacity: .9; }
+  code { background: #1c2723; padding: 2px 6px; border-radius: 5px; font-size: 13px; }
+  a { color: #3CE5B0; }
+  .done { margin-top: 30px; padding: 16px 18px; background: #12211c; border: 1px solid #234; border-radius: 12px; }
+  kbd { background: #1c2723; border: 1px solid #2a3733; border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Anki Word Clipper</h1>
+  <p class="sub">Три шага — и можно ловить слова в Anki прямо со страницы.</p>
+  <ol>
+    <li>
+      <h3>Запусти Anki Desktop</h3>
+      <p>Расширение работает только когда Anki открыт на этом компьютере.</p>
+    </li>
+    <li>
+      <h3>Установи аддон AnkiConnect</h3>
+      <p>В Anki: <b>Tools → Add-ons → Get Add-ons…</b> → введи код <code>2055492159</code> → OK → перезапусти Anki.</p>
+      <p>Это локальный мост между браузером и Anki. <a href="https://ankiweb.net/shared/info/2055492159" target="_blank" rel="noopener">Страница аддона</a>.</p>
+    </li>
+    <li>
+      <h3>Разреши доступ</h3>
+      <p>Открой попап расширения (иконка <b>A</b> на панели) и нажми <b>«Проверить снова»</b>. Anki спросит разрешение — нажми <b>Yes</b>. Появится «Anki подключён ✓».</p>
+    </li>
+  </ol>
+
+  <div class="done">
+    <b>Готово. Как пользоваться:</b>
+    <p>Выдели слово или фразу → нажми кнопку <b>«+ Anki»</b> → перевод подставится сам → <kbd>Enter</kbd>.</p>
+    <p>Ещё: ПКМ по выделению → «Добавить в Anki», хоткей <kbd>Alt+A</kbd>, мгновенный режим и типы карточек — в попапе.</p>
+    <p>Хочешь перевод по контексту и словарную форму с артиклем — включи <b>ИИ-режим</b> в попапе (Gemini даёт бесплатный ключ).</p>
+  </div>
+</div>
+</body>
+</html>

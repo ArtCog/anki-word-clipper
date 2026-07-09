@@ -2,14 +2,19 @@
   "manifest_version": 3,
   "name": "Anki Word Clipper",
   "version": "0.1.0",
-  "description": "Быстро добавляет выделенное слово с контекстом предложения в Anki через AnkiConnect. Работает только локально.",
+  "description": "Быстро добавляет выделенное слово с контекстом предложения в Anki через AnkiConnect. Опционально: перевод и словарная форма через Google/DeepL/ИИ.",
   "permissions": ["storage", "contextMenus", "activeTab"],
   "host_permissions": [
     "http://127.0.0.1:8765/*",
     "https://translate.googleapis.com/*",
     "https://api-free.deepl.com/*",
-    "https://api.deepl.com/*"
+    "https://api.deepl.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://openrouter.ai/*",
+    "https://api.openai.com/*",
+    "http://localhost/*"
   ],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
   "background": {
     "service_worker": "background.js",
     "scripts": ["anki-client.js", "translator.js", "background.js"]

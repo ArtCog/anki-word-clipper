@@ -74,3 +74,48 @@ test("MODEL_DEF has conditional reverse template and exact fields", () => {
   assert.ok(rev.Front.startsWith("{{#AddReverse}}"));
   assert.ok(rev.Front.endsWith("{{/AddReverse}}"));
 });
+
+test("buildModelDef embeds tts tag for the chosen language, none when off", () => {
+  const de = A.buildModelDef("de_DE");
+  assert.ok(de.cardTemplates[0].Front.includes("{{tts de_DE:Word}}"));
+  assert.ok(de.cardTemplates[1].Back.includes("{{tts de_DE:Word}}"));
+  const off = A.buildModelDef("off");
+  assert.ok(!JSON.stringify(off.cardTemplates).includes("{{tts"));
+});
+
+test("buildNoteFields bolds by matchWord when word was normalized to headword", () => {
+  const f = A.buildNoteFields({
+    word: "das Haus, die Häuser", translation: "дом", source: "",
+    context: "In den Häusern ist es warm.", reverse: false, matchWord: "Häusern",
+  });
+  assert.equal(f.Word, "das Haus, die Häuser");
+  assert.equal(f.Context, "In den <b>Häusern</b> ist es warm.");
+});
+
+test("buildClozeText wraps the word occurrence, appends when absent", () => {
+  assert.equal(
+    A.buildClozeText("In den Häusern ist es warm.", "Häusern"),
+    "In den {{c1::Häusern}} ist es warm."
+  );
+  assert.equal(A.buildClozeText("", "Haus"), "{{c1::Haus}}");
+  assert.equal(A.buildClozeText("Ohne Treffer.", "Haus"), "Ohne Treffer.<br>{{c1::Haus}}");
+});
+
+test("buildClozeNoteRequest uses cloze model and original word for the gap", () => {
+  const r = A.buildClozeNoteRequest({
+    word: "das Haus, die Häuser", matchWord: "Häusern", translation: "дом",
+    context: "In den Häusern ist es warm.", source: "s", deck: "Deutsch", allowDuplicate: false,
+  });
+  assert.equal(r.params.note.modelName, "Word Clipper Cloze");
+  assert.equal(r.params.note.fields.Text, "In den {{c1::Häusern}} ist es warm.");
+  assert.equal(r.params.note.fields.Translation, "дом");
+  assert.deepEqual(r.params.note.tags, ["word-clipper"]);
+});
+
+test("cloze model def is isCloze with Text field first", () => {
+  const d = A.buildClozeModelDef();
+  assert.equal(d.modelName, "Word Clipper Cloze");
+  assert.equal(d.isCloze, true);
+  assert.equal(d.inOrderFields[0], "Text");
+  assert.ok(d.cardTemplates[0].Front.includes("{{cloze:Text}}"));
+});

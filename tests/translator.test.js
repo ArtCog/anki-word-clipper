@@ -36,3 +36,32 @@ test("parseDeepLResponse extracts text or null", () => {
   assert.equal(T.parseDeepLResponse({ translations: [] }), null);
   assert.equal(T.parseDeepLResponse(null), null);
 });
+
+test("buildAiRequest targets chat/completions with bearer key and both word and context", () => {
+  const r = T.buildAiRequest("https://openrouter.ai/api/v1/", "google/gemini-2.5-flash", "sk-or-abc", "Häusern", "In den Häusern ist es warm.", "ru");
+  assert.equal(r.url, "https://openrouter.ai/api/v1/chat/completions");
+  assert.equal(r.options.headers.Authorization, "Bearer sk-or-abc");
+  const body = JSON.parse(r.options.body);
+  assert.equal(body.model, "google/gemini-2.5-flash");
+  assert.equal(body.temperature, 0);
+  const user = body.messages.find((m) => m.role === "user").content;
+  assert.ok(user.includes("Häusern"));
+  assert.ok(user.includes("In den Häusern ist es warm."));
+});
+
+test("buildAiRequest omits Authorization without key (Ollama)", () => {
+  const r = T.buildAiRequest("http://localhost:11434/v1", "qwen3:8b", "", "Haus", "", "ru");
+  assert.equal(r.options.headers.Authorization, undefined);
+});
+
+test("parseAiResponse parses plain and fenced JSON", () => {
+  const wrap = (content) => ({ choices: [{ message: { content } }] });
+  const plain = T.parseAiResponse(wrap('{"headword":"das Haus, die Häuser","translation":"дом","note":"n, сущ."}'));
+  assert.deepEqual(plain, { headword: "das Haus, die Häuser", translation: "дом", note: "n, сущ." });
+  const fenced = T.parseAiResponse(wrap('```json\n{"headword":"","translation":"дом","note":""}\n```'));
+  assert.equal(fenced.translation, "дом");
+  assert.equal(fenced.headword, null);
+  assert.equal(T.parseAiResponse(wrap("это не JSON")), null);
+  assert.equal(T.parseAiResponse(wrap('{"headword":"x","note":"y"}')), null); // no translation
+  assert.equal(T.parseAiResponse(null), null);
+});

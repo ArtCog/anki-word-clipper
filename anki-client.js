@@ -10,24 +10,47 @@ const CARD_CSS = `
 .source { margin-top: 1.4em; font-size: .5em; opacity: .4; word-break: break-all; }
 `.trim();
 
-const MODEL_DEF = {
-  modelName: MODEL_NAME,
-  inOrderFields: ["Word", "Translation", "Context", "Source", "AddReverse"],
-  css: CARD_CSS,
-  isCloze: false,
-  cardTemplates: [
-    {
-      Name: "Word → Translation",
-      Front: `<div class="word">{{Word}}</div>`,
-      Back: `{{FrontSide}}<hr id="answer"><div class="translation">{{Translation}}</div><div class="context">{{Context}}</div>`,
-    },
-    {
-      Name: "Translation → Word",
-      Front: `{{#AddReverse}}<div class="word">{{Translation}}</div>{{/AddReverse}}`,
-      Back: `{{FrontSide}}<hr id="answer"><div class="translation">{{Word}}</div><div class="context">{{Context}}</div>`,
-    },
-  ],
-};
+// ttsLang: Anki template tts language ("de_DE", "en_US", …) or "off"
+function buildModelDef(ttsLang = "de_DE") {
+  const tts = ttsLang && ttsLang !== "off" ? `{{tts ${ttsLang}:Word}}` : "";
+  return {
+    modelName: MODEL_NAME,
+    inOrderFields: ["Word", "Translation", "Context", "Source", "AddReverse"],
+    css: CARD_CSS,
+    isCloze: false,
+    cardTemplates: [
+      {
+        Name: "Word → Translation",
+        Front: `<div class="word">{{Word}}</div>${tts}`,
+        Back: `{{FrontSide}}<hr id="answer"><div class="translation">{{Translation}}</div><div class="context">{{Context}}</div>`,
+      },
+      {
+        Name: "Translation → Word",
+        Front: `{{#AddReverse}}<div class="word">{{Translation}}</div>{{/AddReverse}}`,
+        Back: `{{FrontSide}}<hr id="answer"><div class="translation">{{Word}}</div>${tts}<div class="context">{{Context}}</div>`,
+      },
+    ],
+  };
+}
+const MODEL_DEF = buildModelDef();
+
+const CLOZE_MODEL_NAME = "Word Clipper Cloze";
+
+function buildClozeModelDef() {
+  return {
+    modelName: CLOZE_MODEL_NAME,
+    inOrderFields: ["Text", "Translation", "Source"],
+    css: `${CARD_CSS}\n.cloze { color: #2fb890; font-weight: bold; }`,
+    isCloze: true,
+    cardTemplates: [
+      {
+        Name: "Cloze",
+        Front: `<div class="context">{{cloze:Text}}</div>`,
+        Back: `<div class="context">{{cloze:Text}}</div><hr id="answer"><div class="translation">{{Translation}}</div>`,
+      },
+    ],
+  };
+}
 
 function escapeHtml(s) {
   return String(s)
@@ -48,14 +71,46 @@ function boldWord(contextEscaped, wordEscaped) {
   );
 }
 
-function buildNoteFields({ word, translation, context, source, reverse }) {
+// matchWord: the text as it appeared on the page (for bolding/cloze) when
+// `word` was normalized to a dictionary headword by the AI provider.
+function buildNoteFields({ word, translation, context, source, reverse, matchWord }) {
   const w = escapeHtml(String(word).trim());
+  const m = escapeHtml(String(matchWord ?? word).trim());
   return {
     Word: w,
     Translation: escapeHtml(String(translation ?? "").trim()),
-    Context: boldWord(escapeHtml(String(context ?? "").trim()), w),
+    Context: boldWord(escapeHtml(String(context ?? "").trim()), m),
     Source: escapeHtml(String(source ?? "")),
     AddReverse: reverse ? "y" : "",
+  };
+}
+
+function buildClozeText(context, word) {
+  const esc = escapeHtml(String(context ?? "").trim());
+  const w = escapeHtml(String(word ?? "").trim());
+  if (!esc) return `{{c1::${w}}}`;
+  const idx = esc.toLowerCase().indexOf(w.toLowerCase());
+  if (idx === -1) return `${esc}<br>{{c1::${w}}}`;
+  return `${esc.slice(0, idx)}{{c1::${esc.slice(idx, idx + w.length)}}}${esc.slice(idx + w.length)}`;
+}
+
+function buildClozeNoteRequest(note) {
+  return {
+    action: "addNote",
+    version: 6,
+    params: {
+      note: {
+        deckName: note.deck,
+        modelName: CLOZE_MODEL_NAME,
+        fields: {
+          Text: buildClozeText(note.context, note.matchWord ?? note.word),
+          Translation: escapeHtml(String(note.translation ?? "").trim()),
+          Source: escapeHtml(String(note.source ?? "")),
+        },
+        options: { allowDuplicate: !!note.allowDuplicate },
+        tags: ["word-clipper"],
+      },
+    },
   };
 }
 
@@ -95,7 +150,8 @@ function interpretResponse(json) {
 }
 
 const AnkiClient = {
-  MODEL_NAME, MODEL_DEF, escapeHtml, boldWord,
-  buildNoteFields, buildAddNoteRequest, classifyAnkiError, interpretResponse,
+  MODEL_NAME, MODEL_DEF, CLOZE_MODEL_NAME, buildModelDef, buildClozeModelDef,
+  escapeHtml, boldWord, buildNoteFields, buildAddNoteRequest,
+  buildClozeText, buildClozeNoteRequest, classifyAnkiError, interpretResponse,
 };
 if (typeof module !== "undefined" && module.exports) module.exports = AnkiClient;

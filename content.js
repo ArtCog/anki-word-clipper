@@ -55,9 +55,9 @@
     }
     textarea { resize: vertical; min-height: 44px; transition: height .12s; }
     input:focus, textarea:focus, select:focus { outline: none; border-color: #3CE5B0; }
-    .wc-rev-row { display: flex; gap: 7px; align-items: center; margin-top: 8px; font-size: 12px; opacity: .9; }
-    .wc-rev-row label { all: unset; cursor: pointer; font-size: 12px; }
-    .wc-row { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+    .wc-note { font-size: 11px; color: #7bdcc0; opacity: .95; margin: 5px 0 0; }
+    .wc-note:empty { display: none; }
+    .wc-row { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
     .wc-add {
       background: #3CE5B0; color: #0B0F0E; border: 0; border-radius: 8px;
       padding: 7px 16px; font-weight: 700; cursor: pointer;
@@ -153,9 +153,14 @@
       <div class="wc-head"><span>+ Anki</span><button class="wc-x" title="Закрыть">×</button></div>
       <label>Слово / фраза</label><input type="text" class="wc-word">
       <label>Перевод / пояснение</label><input type="text" class="wc-tr" placeholder="можно оставить пустым">
+      <div class="wc-note"></div>
       <label>Контекст</label><textarea class="wc-ctx" rows="2"></textarea>
+      <label>Тип карточки</label><select class="wc-type">
+        <option value="basic">Обычная (слово → перевод)</option>
+        <option value="reverse">Двусторонняя (+ перевод → слово)</option>
+        <option value="cloze">Пропуск в предложении (cloze)</option>
+      </select>
       <label>Колода</label><select class="wc-deck"></select>
-      <div class="wc-rev-row"><input type="checkbox" class="wc-rev" id="wc-rev"><label for="wc-rev">обратная карточка (перевод → слово)</label></div>
       <div class="wc-row"><button class="wc-add">Добавить</button><span class="wc-status"></span></div>
     `;
     form.querySelector(".wc-x").addEventListener("click", closeForm);
@@ -268,6 +273,7 @@
     q(".wc-word").value = cap.word;
     q(".wc-tr").value = "";
     q(".wc-ctx").value = cap.context;
+    q(".wc-note").textContent = "";
     setStatus("");
     const left = Math.max(8, Math.min(cap.rect.left, innerWidth - 336));
     const top = cap.rect.bottom + 8 + 340 < innerHeight ? cap.rect.bottom + 8 : Math.max(8, cap.rect.top - 348);
@@ -276,7 +282,7 @@
     form.classList.add("show");
 
     const st = await send({ type: "GET_SETTINGS" });
-    q(".wc-rev").checked = !!st?.settings?.defaultReverse;
+    q(".wc-type").value = st?.settings?.defaultCardType ?? "basic";
     q(".wc-tr").focus();
     requestTranslation(cap.word);
 
@@ -304,7 +310,9 @@
   }
 
   // Fill the translation field asynchronously; never overwrite what the
-  // user already typed, and ignore stale responses after a reopen.
+  // user already typed, and ignore stale responses after a reopen. With an AI
+  // provider we also get a dictionary headword (put into Word) and a short
+  // grammar note (shown as a hint).
   let translateSeq = 0;
   let trEdited = false; // user typed their own translation — never overwrite it
   async function requestTranslation(word) {
@@ -312,10 +320,15 @@
     const seq = ++translateSeq;
     const tr = q(".wc-tr");
     tr.placeholder = "перевожу…";
-    const res = await send({ type: "TRANSLATE", text: word });
+    const res = await send({ type: "TRANSLATE", text: word, context: q(".wc-ctx").value });
     if (seq !== translateSeq || !formOpen()) return;
     tr.placeholder = "можно оставить пустым";
-    if (res.ok && !trEdited) tr.value = res.translation;
+    if (!res.ok) return;
+    if (!trEdited) tr.value = res.translation;
+    if (res.provider === "ai") {
+      if (res.headword && !trEdited) q(".wc-word").value = res.headword;
+      q(".wc-note").textContent = res.note ?? "";
+    }
   }
 
   function setStatus(text, isErr = false, action = null) {
@@ -331,23 +344,28 @@
   }
 
   async function submit(allowDuplicate) {
+    const cardType = q(".wc-type").value;
     const note = {
       word: q(".wc-word").value,
+      matchWord: currentCapture?.word ?? q(".wc-word").value, // the form in the sentence
       translation: q(".wc-tr").value,
       context: q(".wc-ctx").value,
       source: currentCapture?.source ?? `${document.title} — ${location.href}`,
-      reverse: q(".wc-rev").checked,
+      cardType,
       deck: q(".wc-deck").value,
       allowDuplicate,
     };
     if (!note.word.trim()) return setStatus("Слово пустое", true);
     if (!note.deck) return setStatus("Выбери колоду", true);
+    if (cardType === "cloze" && !note.context.trim()) {
+      return setStatus("Для cloze нужен контекст", true);
+    }
     q(".wc-add").disabled = true;
     setStatus("Добавляю…");
     const res = await send({ type: "ADD_NOTE", note });
     q(".wc-add").disabled = false;
     if (res.ok) {
-      send({ type: "SET_SETTINGS", patch: { defaultReverse: note.reverse } });
+      send({ type: "SET_SETTINGS", patch: { defaultCardType: cardType } });
       closeForm();
       showToast("Добавлено в Anki ✓");
     } else if (res.code === "DUPLICATE") {
@@ -365,12 +383,17 @@
     const st = await send({ type: "GET_SETTINGS" });
     const deck = st?.settings?.lastDeck;
     if (!deck) { openForm(cap); return; } // first ever use: no deck yet — fall back to form
-    let translation = "";
-    const tr = await send({ type: "TRANSLATE", text: cap.word });
-    if (tr.ok) translation = tr.translation;
+    let cardType = st.settings.defaultCardType ?? "basic";
+    if (cardType === "cloze" && !cap.context) cardType = "basic"; // no sentence → no gap
+    let word = cap.word, translation = "";
+    const tr = await send({ type: "TRANSLATE", text: cap.word, context: cap.context });
+    if (tr.ok) {
+      translation = tr.translation;
+      if (tr.provider === "ai" && tr.headword) word = tr.headword;
+    }
     const note = {
-      word: cap.word, translation, context: cap.context, source: cap.source,
-      reverse: !!st.settings.defaultReverse, deck, allowDuplicate,
+      word, matchWord: cap.word, translation, context: cap.context, source: cap.source,
+      cardType, deck, allowDuplicate,
     };
     const res = await send({ type: "ADD_NOTE", note });
     if (res.ok) showToast(`Добавлено в «${deck}» ✓`);

@@ -6,8 +6,12 @@ if (typeof importScripts === "function") importScripts("anki-client.js", "transl
 const api = globalThis.browser ?? globalThis.chrome;
 const ANKI_URL = "http://127.0.0.1:8765";
 const DEFAULT_SETTINGS = {
-  lastDeck: null, instantMode: false, defaultReverse: false,
+  lastDeck: null, instantMode: false,
+  defaultCardType: "basic",           // "basic" | "reverse" | "cloze"
   autoTranslate: true, targetLang: "ru", deeplKey: "",
+  aiEnabled: false, aiBaseUrl: "", aiModel: "", aiKey: "",
+  ttsLang: "off",                     // Anki tts lang tag: "off" | "de_DE" | "en_US" | …
+  modelTtsLang: null,                 // internal: tts lang the main model was built with
 };
 
 let modelReady = false;
@@ -34,10 +38,29 @@ async function ankiFetch(action, params = {}) {
   return out.result;
 }
 
+// updateModelTemplates wants { "Template Name": {Front, Back}, … }
+function templatesObj(def) {
+  const o = {};
+  for (const t of def.cardTemplates) o[t.Name] = { Front: t.Front, Back: t.Back };
+  return o;
+}
+
+// Ensures both note types exist and keeps the main model's TTS templates in
+// sync with the current setting (createModel only runs once; a later TTS
+// change is applied via updateModelTemplates).
 async function ensureModel() {
+  const s = await getSettings();
   const names = await ankiFetch("modelNames");
+  const def = AnkiClient.buildModelDef(s.ttsLang);
   if (!names.includes(AnkiClient.MODEL_NAME)) {
-    await ankiFetch("createModel", AnkiClient.MODEL_DEF);
+    await ankiFetch("createModel", def);
+    await patchSettings({ modelTtsLang: s.ttsLang });
+  } else if (s.modelTtsLang !== s.ttsLang) {
+    await ankiFetch("updateModelTemplates", { model: { name: def.modelName, templates: templatesObj(def) } });
+    await patchSettings({ modelTtsLang: s.ttsLang });
+  }
+  if (!names.includes(AnkiClient.CLOZE_MODEL_NAME)) {
+    await ankiFetch("createModel", AnkiClient.buildClozeModelDef());
   }
 }
 
@@ -83,13 +106,16 @@ async function getDecks() {
   }
 }
 
+// note.cardType: "basic" | "reverse" | "cloze"
 async function addNote(note) {
   if (!note?.word?.trim()) return { ok: false, code: "UNKNOWN", message: "Пустое слово" };
   if (!note.deck) return { ok: false, code: "DECK_MISSING", message: "Колода не выбрана" };
   const c = await check();
   if (!c.ok) return c;
   try {
-    const req = AnkiClient.buildAddNoteRequest(note);
+    const req = note.cardType === "cloze"
+      ? AnkiClient.buildClozeNoteRequest(note)
+      : AnkiClient.buildAddNoteRequest({ ...note, reverse: note.cardType === "reverse" });
     await ankiFetch(req.action, req.params);
     await patchSettings({ lastDeck: note.deck });
     return { ok: true };
@@ -108,27 +134,64 @@ async function fetchWithTimeout(url, options = {}, ms = 5000) {
   }
 }
 
+const aiConfigured = (s) => s.aiEnabled && s.aiBaseUrl?.trim() && s.aiModel?.trim();
+
+// AI provider: context-aware. Returns dictionary headword + contextual
+// translation + short grammar note. Never throws — failures bubble up so the
+// caller can fall back to a plain translator.
+async function aiTranslate(s, text, context) {
+  const req = Translator.buildAiRequest(s.aiBaseUrl, s.aiModel, s.aiKey, text, context ?? "", s.targetLang);
+  const res = await fetchWithTimeout(req.url, req.options, 20000);
+  if (!res.ok) throw new Error(`AI HTTP ${res.status}`);
+  const out = Translator.parseAiResponse(await res.json());
+  if (!out) throw new Error("AI: пустой/некорректный ответ");
+  return { ok: true, provider: "ai", ...out }; // {translation, headword, note}
+}
+
+async function plainTranslate(s, text) {
+  if (s.deeplKey?.trim()) {
+    const req = Translator.buildDeepLRequest(text, s.targetLang, s.deeplKey);
+    const res = await fetchWithTimeout(req.url, req.options);
+    if (!res.ok) throw new Error(`DeepL HTTP ${res.status}`);
+    const t = Translator.parseDeepLResponse(await res.json());
+    if (!t) throw new Error("DeepL: пустой ответ");
+    return { ok: true, translation: t, provider: "deepl" };
+  }
+  const res = await fetchWithTimeout(Translator.buildGoogleUrl(text, s.targetLang));
+  if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
+  const t = Translator.parseGoogleResponse(await res.json());
+  if (!t) throw new Error("Google: пустой ответ");
+  return { ok: true, translation: t, provider: "google" };
+}
+
 // Translation is a convenience: any failure returns ok:false and the caller
 // proceeds with an empty translation instead of blocking the card.
-async function translate(text) {
+async function translate(text, context) {
   const s = await getSettings();
   if (!s.autoTranslate || !text?.trim()) return { ok: false, code: "DISABLED", message: "" };
-  try {
-    if (s.deeplKey?.trim()) {
-      const req = Translator.buildDeepLRequest(text, s.targetLang, s.deeplKey);
-      const res = await fetchWithTimeout(req.url, req.options);
-      if (!res.ok) throw new Error(`DeepL HTTP ${res.status}`);
-      const t = Translator.parseDeepLResponse(await res.json());
-      if (t) return { ok: true, translation: t, provider: "deepl" };
-      throw new Error("DeepL: пустой ответ");
+  if (aiConfigured(s)) {
+    try {
+      return await aiTranslate(s, text, context);
+    } catch {
+      // fall through to plain translator so the field still fills
     }
-    const res = await fetchWithTimeout(Translator.buildGoogleUrl(text, s.targetLang));
-    if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
-    const t = Translator.parseGoogleResponse(await res.json());
-    if (t) return { ok: true, translation: t, provider: "google" };
-    throw new Error("Google: пустой ответ");
+  }
+  try {
+    return await plainTranslate(s, text);
   } catch (e) {
     return { ok: false, code: "TRANSLATE_FAILED", message: String(e?.message ?? e) };
+  }
+}
+
+// Popup "Проверить AI" button: surface the real error to the user.
+async function testAi() {
+  const s = await getSettings();
+  if (!aiConfigured(s)) return { ok: false, message: "Укажи URL, модель и (если нужно) ключ." };
+  try {
+    const r = await aiTranslate(s, "Haus", "Das Haus ist groß.");
+    return { ok: true, sample: r };
+  } catch (e) {
+    return { ok: false, message: String(e?.message ?? e) };
   }
 }
 
@@ -137,9 +200,13 @@ async function handleMessage(msg) {
     case "CHECK_CONNECTION": return check();
     case "GET_DECKS": return getDecks();
     case "ADD_NOTE": return addNote(msg.note);
-    case "TRANSLATE": return translate(msg.text);
+    case "TRANSLATE": return translate(msg.text, msg.context);
+    case "TEST_AI": return testAi();
     case "GET_SETTINGS": return { ok: true, settings: await getSettings() };
-    case "SET_SETTINGS": await patchSettings(msg.patch ?? {}); return { ok: true };
+    case "SET_SETTINGS":
+      await patchSettings(msg.patch ?? {});
+      if (msg.patch && "ttsLang" in msg.patch) modelReady = false; // re-sync templates
+      return { ok: true };
     default: return { ok: false, code: "UNKNOWN", message: `Unknown message: ${msg?.type}` };
   }
 }
@@ -151,9 +218,12 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return true; // async sendResponse
 });
 
-api.runtime.onInstalled.addListener(() => {
+api.runtime.onInstalled.addListener((details) => {
   api.contextMenus.create({ id: "wc-form", title: "Добавить в Anki…", contexts: ["selection"] });
   api.contextMenus.create({ id: "wc-instant", title: "Добавить в Anki мгновенно", contexts: ["selection"] });
+  if (details.reason === "install") {
+    api.tabs.create({ url: api.runtime.getURL("welcome.html") });
+  }
 });
 
 function flashBadge(text) {
@@ -174,7 +244,7 @@ api.contextMenus.onClicked.addListener(async (info, tab) => {
     if (!s.lastDeck) { flashBadge("!"); return; }
     const res = await addNote({
       word: info.selectionText, translation: "", context: "",
-      source: tab.title ?? "", reverse: s.defaultReverse,
+      source: tab.title ?? "", cardType: s.defaultCardType,
       deck: s.lastDeck, allowDuplicate: false,
     });
     flashBadge(res.ok ? "✓" : "!");
