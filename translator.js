@@ -48,7 +48,9 @@ const AI_SYSTEM_PROMPT =
   '(German e.g. "gehen, ging, ist gegangen"; English irregular e.g. "go, went, gone"); ' +
   "empty string for everything that is not a verb. " +
   '"translation" — concise translation into the target language, the meaning IN THIS CONTEXT. ' +
-  '"note" — very short grammar hint (part of speech, gender, separable prefix, case government, irregularity); may be empty. ' +
+  '"note" — very short human-readable grammar hint written in the TARGET language ' +
+  '(e.g. "гл., отделяемая приставка", "прил.", "модальный глагол"); no dictionary codes like "m, -(e)s, -e"; ' +
+  "for nouns do NOT repeat gender/article/plural — they are already in headword; may be empty. " +
   "Keep it compact. Never add commentary.";
 
 function buildAiRequest(baseUrl, model, apiKey, word, context, targetLang, extraInstructions) {
