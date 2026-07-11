@@ -57,7 +57,7 @@ test("buildAiRequest omits Authorization without key (Ollama)", () => {
 test("parseAiResponse parses plain and fenced JSON", () => {
   const wrap = (content) => ({ choices: [{ message: { content } }] });
   const plain = T.parseAiResponse(wrap('{"headword":"das Haus, die Häuser","translation":"дом","note":"n, сущ."}'));
-  assert.deepEqual(plain, { headword: "das Haus, die Häuser", forms: null, translation: "дом", note: "n, сущ." });
+  assert.deepEqual(plain, { headword: "das Haus, die Häuser", forms: null, translation: "дом", note: "n, сущ.", example: null });
   const fenced = T.parseAiResponse(wrap('```json\n{"headword":"","translation":"дом","note":""}\n```'));
   assert.equal(fenced.translation, "дом");
   assert.equal(fenced.headword, null);
