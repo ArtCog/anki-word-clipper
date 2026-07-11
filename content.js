@@ -332,6 +332,8 @@
       // verbs keep the form selected on the page; nouns get article + plural
       if (res.headword && !aiForms && !trEdited) q(".wc-word").value = res.headword;
       q(".wc-note").textContent = [aiForms, res.note].filter(Boolean).join(" · ");
+    } else if (res.fallbackError) {
+      q(".wc-note").textContent = `⚠ ${res.fallbackFrom === "deepl" ? "DeepL" : "ИИ"} не сработал (${res.fallbackError}) — перевёл Google`;
     }
   }
 

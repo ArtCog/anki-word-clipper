@@ -193,14 +193,28 @@ async function googleTranslate(s, text) {
 async function translate(text, context) {
   const s = await getSettings();
   if (!s.autoTranslate || !text?.trim()) return { ok: false, code: "DISABLED", message: "" };
-  try {
-    if (s.engine === "ai" && aiConfigured(s)) return await aiTranslate(s, text, context);
-    if (s.engine === "deepl" && s.deeplKey?.trim()) return await deeplTranslate(s, text);
-  } catch {
-    // chosen engine failed — fall back to Google so the field still fills
+  // fall back to Google when the chosen engine can't answer — but tell the
+  // user WHY, otherwise a misconfigured AI silently looks like "no forms"
+  let fallbackError = null;
+  if (s.engine === "ai" && !aiConfigured(s)) {
+    fallbackError = "ИИ не настроен — открой попап расширения";
+  } else if (s.engine === "deepl" && !s.deeplKey?.trim()) {
+    fallbackError = "нет DeepL-ключа — открой попап расширения";
+  } else {
+    try {
+      if (s.engine === "ai") return await aiTranslate(s, text, context);
+      if (s.engine === "deepl") return await deeplTranslate(s, text);
+    } catch (e) {
+      fallbackError = String(e?.message ?? e);
+    }
   }
   try {
-    return await googleTranslate(s, text);
+    const r = await googleTranslate(s, text);
+    if (fallbackError) {
+      r.fallbackFrom = s.engine;
+      r.fallbackError = fallbackError;
+    }
+    return r;
   } catch (e) {
     return { ok: false, code: "TRANSLATE_FAILED", message: String(e?.message ?? e) };
   }
