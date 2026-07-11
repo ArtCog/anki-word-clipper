@@ -57,7 +57,7 @@ test("buildAiRequest omits Authorization without key (Ollama)", () => {
 test("parseAiResponse parses plain and fenced JSON", () => {
   const wrap = (content) => ({ choices: [{ message: { content } }] });
   const plain = T.parseAiResponse(wrap('{"headword":"das Haus, die Häuser","translation":"дом","note":"n, сущ."}'));
-  assert.deepEqual(plain, { headword: "das Haus, die Häuser", translation: "дом", note: "n, сущ." });
+  assert.deepEqual(plain, { headword: "das Haus, die Häuser", forms: null, translation: "дом", note: "n, сущ." });
   const fenced = T.parseAiResponse(wrap('```json\n{"headword":"","translation":"дом","note":""}\n```'));
   assert.equal(fenced.translation, "дом");
   assert.equal(fenced.headword, null);
@@ -74,4 +74,11 @@ test("system prompt teaches verb principal forms; extra instructions are appende
   const r2 = T.buildAiRequest("https://x/v1", "m", "k", "w", "", "ru", "always add IPA");
   const sys2 = JSON.parse(r2.options.body).messages[0].content;
   assert.ok(sys2.includes("always add IPA"));
+});
+
+test("parseAiResponse passes verb forms through", () => {
+  const wrap = (content) => ({ choices: [{ message: { content } }] });
+  const r = T.parseAiResponse(wrap('{"headword":"verzögern","forms":"verzögern, verzögerte, hat verzögert","translation":"задерживать","note":"глагол"}'));
+  assert.equal(r.forms, "verzögern, verzögerte, hat verzögert");
+  assert.equal(T.parseAiResponse(wrap('{"translation":"дом"}')).forms, null);
 });

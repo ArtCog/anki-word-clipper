@@ -43,9 +43,10 @@ const AI_SYSTEM_PROMPT =
   "appears in a sentence, return STRICT JSON (no prose, no code fence) with keys: " +
   '"headword" — the dictionary form: ' +
   'German nouns → article + plural (e.g. "das Haus, die Häuser"); ' +
-  'German verbs → the three principal forms with auxiliary (e.g. "gehen, ging, ist gegangen"); ' +
-  'English irregular verbs → base, past, past participle (e.g. "go, went, gone"); ' +
   "other words → plain base form; empty string if not applicable. " +
+  '"forms" — for verbs ONLY: the principal forms with auxiliary, comma-separated ' +
+  '(German e.g. "gehen, ging, ist gegangen"; English irregular e.g. "go, went, gone"); ' +
+  "empty string for everything that is not a verb. " +
   '"translation" — concise translation into the target language, the meaning IN THIS CONTEXT. ' +
   '"note" — very short grammar hint (part of speech, gender, separable prefix, case government, irregularity); may be empty. ' +
   "Keep it compact. Never add commentary.";
@@ -96,6 +97,7 @@ function parseAiResponse(json) {
   if (!translation) return null;
   return {
     headword: String(obj.headword ?? "").trim() || null,
+    forms: String(obj.forms ?? "").trim() || null,
     translation,
     note: String(obj.note ?? "").trim() || null,
   };

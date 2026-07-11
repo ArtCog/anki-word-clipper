@@ -270,6 +270,7 @@
     ensureUi();
     currentCapture = cap;
     trEdited = false;
+    aiForms = "";
     q(".wc-word").value = cap.word;
     q(".wc-tr").value = "";
     q(".wc-ctx").value = cap.context;
@@ -315,6 +316,7 @@
   // grammar note (shown as a hint).
   let translateSeq = 0;
   let trEdited = false; // user typed their own translation — never overwrite it
+  let aiForms = "";     // verb principal forms from the AI — saved into the Forms field
   async function requestTranslation(word) {
     if (!word?.trim()) return;
     const seq = ++translateSeq;
@@ -326,8 +328,10 @@
     if (!res.ok) return;
     if (!trEdited) tr.value = res.translation;
     if (res.provider === "ai") {
-      if (res.headword && !trEdited) q(".wc-word").value = res.headword;
-      q(".wc-note").textContent = res.note ?? "";
+      aiForms = res.forms ?? "";
+      // verbs keep the form selected on the page; nouns get article + plural
+      if (res.headword && !aiForms && !trEdited) q(".wc-word").value = res.headword;
+      q(".wc-note").textContent = [aiForms, res.note].filter(Boolean).join(" · ");
     }
   }
 
@@ -351,6 +355,7 @@
       translation: q(".wc-tr").value,
       context: q(".wc-ctx").value,
       source: currentCapture?.source ?? `${document.title} — ${location.href}`,
+      forms: aiForms,
       cardType,
       deck: q(".wc-deck").value,
       allowDuplicate,
@@ -385,14 +390,16 @@
     if (!deck) { openForm(cap); return; } // first ever use: no deck yet — fall back to form
     let cardType = st.settings.defaultCardType ?? "basic";
     if (cardType === "cloze" && !cap.context) cardType = "basic"; // no sentence → no gap
-    let word = cap.word, translation = "";
+    let word = cap.word, translation = "", forms = "";
     const tr = await send({ type: "TRANSLATE", text: cap.word, context: cap.context });
     if (tr.ok) {
       translation = tr.translation;
-      if (tr.provider === "ai" && tr.headword) word = tr.headword;
+      forms = tr.forms ?? "";
+      // verbs keep the form from the page; nouns get article + plural
+      if (tr.provider === "ai" && tr.headword && !forms) word = tr.headword;
     }
     const note = {
-      word, matchWord: cap.word, translation, context: cap.context, source: cap.source,
+      word, matchWord: cap.word, translation, forms, context: cap.context, source: cap.source,
       cardType, deck, allowDuplicate,
     };
     const res = await send({ type: "ADD_NOTE", note });

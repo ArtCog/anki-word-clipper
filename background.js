@@ -57,9 +57,17 @@ async function ensureModel() {
   if (!names.includes(AnkiClient.MODEL_NAME)) {
     await ankiFetch("createModel", def);
     await patchSettings({ modelTtsLang: s.ttsLang });
-  } else if (s.modelTtsLang !== s.ttsLang) {
-    await ankiFetch("updateModelTemplates", { model: { name: def.modelName, templates: templatesObj(def) } });
-    await patchSettings({ modelTtsLang: s.ttsLang });
+  } else {
+    // migration: older installs lack the Forms field
+    const fields = await ankiFetch("modelFieldNames", { modelName: AnkiClient.MODEL_NAME });
+    const addForms = !fields.includes("Forms");
+    if (addForms) {
+      await ankiFetch("modelFieldAdd", { modelName: AnkiClient.MODEL_NAME, fieldName: "Forms" });
+    }
+    if (addForms || s.modelTtsLang !== s.ttsLang) {
+      await ankiFetch("updateModelTemplates", { model: { name: def.modelName, templates: templatesObj(def) } });
+      await patchSettings({ modelTtsLang: s.ttsLang });
+    }
   }
   if (!names.includes(AnkiClient.CLOZE_MODEL_NAME)) {
     await ankiFetch("createModel", AnkiClient.buildClozeModelDef());

@@ -67,7 +67,7 @@ test("interpretResponse", () => {
 });
 
 test("MODEL_DEF has conditional reverse template and exact fields", () => {
-  assert.deepEqual(A.MODEL_DEF.inOrderFields, ["Word", "Translation", "Context", "Source", "AddReverse"]);
+  assert.deepEqual(A.MODEL_DEF.inOrderFields, ["Word", "Translation", "Context", "Source", "AddReverse", "Forms"]);
   assert.equal(A.MODEL_DEF.modelName, "Word Clipper");
   assert.equal(A.MODEL_DEF.cardTemplates.length, 2);
   const rev = A.MODEL_DEF.cardTemplates[1];
@@ -118,4 +118,14 @@ test("cloze model def is isCloze with Text field first", () => {
   assert.equal(d.isCloze, true);
   assert.equal(d.inOrderFields[0], "Text");
   assert.ok(d.cardTemplates[0].Front.includes("{{cloze:Text}}"));
+});
+
+test("buildNoteFields stores verb forms in the Forms field", () => {
+  const f = A.buildNoteFields({
+    word: "verzögert", translation: "задерживает", context: "", source: "",
+    reverse: false, forms: "verzögern, verzögerte, hat verzögert",
+  });
+  assert.equal(f.Forms, "verzögern, verzögerte, hat verzögert");
+  assert.equal(f.Word, "verzögert");
+  assert.equal(A.buildNoteFields({ word: "Haus", translation: "", context: "", source: "", reverse: false }).Forms, "");
 });
