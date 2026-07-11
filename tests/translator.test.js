@@ -82,3 +82,13 @@ test("parseAiResponse passes verb forms through", () => {
   assert.equal(r.forms, "verzögern, verzögerte, hat verzögert");
   assert.equal(T.parseAiResponse(wrap('{"translation":"дом"}')).forms, null);
 });
+
+test("example key: requested via flag, parsed from response", () => {
+  const withEx = T.buildAiRequest("https://x/v1", "m", "k", "w", "", "ru", "", true);
+  assert.ok(JSON.parse(withEx.options.body).messages[0].content.includes('"example"'));
+  const without = T.buildAiRequest("https://x/v1", "m", "k", "w", "", "ru", "", false);
+  assert.ok(!JSON.parse(without.options.body).messages[0].content.includes('"example"'));
+  const wrap = (content) => ({ choices: [{ message: { content } }] });
+  const r = T.parseAiResponse(wrap('{"translation":"дом","example":"Das Haus ist alt."}'));
+  assert.equal(r.example, "Das Haus ist alt.");
+});

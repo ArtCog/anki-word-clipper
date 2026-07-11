@@ -50,18 +50,21 @@ const AI_SYSTEM_PROMPT =
   '"translation" — concise translation into the target language, the meaning IN THIS CONTEXT. ' +
   '"note" — very short human-readable grammar hint written in the TARGET language ' +
   '(e.g. "гл., отделяемая приставка", "прил.", "модальный глагол"); no dictionary codes like "m, -(e)s, -e"; ' +
-  "for nouns do NOT repeat gender/article/plural — they are already in headword; may be empty. " +
+  "for nouns do NOT repeat gender/article/plural — they are already in headword; " +
+  'when helpful append 1–2 simpler synonyms in the SOURCE language (e.g. "≈ verbessern, stärken"); may be empty. ' +
   "Keep it compact. Never add commentary.";
 
-function buildAiRequest(baseUrl, model, apiKey, word, context, targetLang, extraInstructions) {
+function buildAiRequest(baseUrl, model, apiKey, word, context, targetLang, extraInstructions, wantExample) {
   const base = String(baseUrl).replace(/\/+$/, "");
   const headers = { "Content-Type": "application/json" };
   const key = String(apiKey ?? "").trim();
   if (key) headers.Authorization = `Bearer ${key}`;
+  let sys = AI_SYSTEM_PROMPT;
+  if (wantExample) {
+    sys += ' Also include key "example" — one short, simple (A2–B1 level) example sentence in the SOURCE language using the headword; it must differ from the given sentence.';
+  }
   const extra = String(extraInstructions ?? "").trim();
-  const sys = extra
-    ? `${AI_SYSTEM_PROMPT}\nAdditional user instructions (they win over the defaults above): ${extra}`
-    : AI_SYSTEM_PROMPT;
+  if (extra) sys += `\nAdditional user instructions (they win over the defaults above): ${extra}`;
   const userMsg =
     `Target language: ${targetLang}\nWord or phrase: ${word}\n` +
     (context ? `Sentence: ${context}` : "Sentence: (none)");
@@ -102,6 +105,7 @@ function parseAiResponse(json) {
     forms: String(obj.forms ?? "").trim() || null,
     translation,
     note: String(obj.note ?? "").trim() || null,
+    example: String(obj.example ?? "").trim() || null,
   };
 }
 

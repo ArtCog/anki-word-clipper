@@ -57,6 +57,8 @@
     input:focus, textarea:focus, select:focus { outline: none; border-color: #3CE5B0; }
     .wc-note { font-size: 11px; color: #7bdcc0; opacity: .95; margin: 5px 0 0; }
     .wc-note:empty { display: none; }
+    .wc-example { font-size: 11px; font-style: italic; opacity: .7; margin: 4px 0 0; }
+    .wc-example:empty { display: none; }
     .wc-row { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
     .wc-add {
       background: #3CE5B0; color: #0B0F0E; border: 0; border-radius: 8px;
@@ -155,6 +157,7 @@
       <label>Перевод / пояснение</label><input type="text" class="wc-tr" placeholder="можно оставить пустым">
       <div class="wc-note"></div>
       <label>Контекст</label><textarea class="wc-ctx" rows="2"></textarea>
+      <div class="wc-example"></div>
       <label>Тип карточки</label><select class="wc-type">
         <option value="basic">Обычная (слово → перевод)</option>
         <option value="reverse">Двусторонняя (+ перевод → слово)</option>
@@ -271,10 +274,12 @@
     currentCapture = cap;
     trEdited = false;
     aiForms = "";
+    aiExample = "";
     q(".wc-word").value = cap.word;
     q(".wc-tr").value = "";
     q(".wc-ctx").value = cap.context;
     q(".wc-note").textContent = "";
+    q(".wc-example").textContent = "";
     setStatus("");
     const left = Math.max(8, Math.min(cap.rect.left, innerWidth - 336));
     const top = cap.rect.bottom + 8 + 340 < innerHeight ? cap.rect.bottom + 8 : Math.max(8, cap.rect.top - 348);
@@ -315,8 +320,9 @@
   // provider we also get a dictionary headword (put into Word) and a short
   // grammar note (shown as a hint).
   let translateSeq = 0;
-  let trEdited = false; // user typed their own translation — never overwrite it
-  let aiForms = "";     // verb principal forms from the AI — saved into the Forms field
+  let trEdited = false;  // user typed their own translation — never overwrite it
+  let aiForms = "";      // verb principal forms from the AI — saved into the Forms field
+  let aiExample = "";    // optional AI example sentence — saved into the Example field
   async function requestTranslation(word) {
     if (!word?.trim()) return;
     const seq = ++translateSeq;
@@ -329,9 +335,11 @@
     if (!trEdited) tr.value = res.translation;
     if (res.provider === "ai") {
       aiForms = res.forms ?? "";
+      aiExample = res.example ?? "";
       // verbs keep the form selected on the page; nouns get article + plural
       if (res.headword && !aiForms && !trEdited) q(".wc-word").value = res.headword;
       q(".wc-note").textContent = [aiForms, res.note].filter(Boolean).join(" · ");
+      q(".wc-example").textContent = aiExample;
     } else if (res.fallbackError) {
       q(".wc-note").textContent = `⚠ ${res.fallbackFrom === "deepl" ? "DeepL" : "ИИ"} не сработал (${res.fallbackError}) — перевёл Google`;
     }
@@ -358,6 +366,7 @@
       context: q(".wc-ctx").value,
       source: currentCapture?.source ?? `${document.title} — ${location.href}`,
       forms: aiForms,
+      example: aiExample,
       cardType,
       deck: q(".wc-deck").value,
       allowDuplicate,
@@ -392,16 +401,17 @@
     if (!deck) { openForm(cap); return; } // first ever use: no deck yet — fall back to form
     let cardType = st.settings.defaultCardType ?? "basic";
     if (cardType === "cloze" && !cap.context) cardType = "basic"; // no sentence → no gap
-    let word = cap.word, translation = "", forms = "";
+    let word = cap.word, translation = "", forms = "", example = "";
     const tr = await send({ type: "TRANSLATE", text: cap.word, context: cap.context });
     if (tr.ok) {
       translation = tr.translation;
       forms = tr.forms ?? "";
+      example = tr.example ?? "";
       // verbs keep the form from the page; nouns get article + plural
       if (tr.provider === "ai" && tr.headword && !forms) word = tr.headword;
     }
     const note = {
-      word, matchWord: cap.word, translation, forms, context: cap.context, source: cap.source,
+      word, matchWord: cap.word, translation, forms, example, context: cap.context, source: cap.source,
       cardType, deck, allowDuplicate,
     };
     const res = await send({ type: "ADD_NOTE", note });

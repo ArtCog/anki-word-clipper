@@ -9,6 +9,7 @@ const CARD_CSS = `
 .context b { color: #2fb890; }
 .source { margin-top: 1.4em; font-size: .5em; opacity: .4; word-break: break-all; }
 .forms { margin-top: .4em; font-size: .6em; opacity: .65; }
+.example { margin-top: .5em; font-size: .7em; opacity: .8; font-style: italic; }
 `.trim();
 
 // ttsLang: Anki template tts language ("de_DE", "en_US", …) or "off"
@@ -16,20 +17,20 @@ function buildModelDef(ttsLang = "de_DE") {
   const tts = ttsLang && ttsLang !== "off" ? `{{tts ${ttsLang}:Word}}` : "";
   return {
     modelName: MODEL_NAME,
-    // Forms is last: modelFieldAdd appends, so migrated models match new ones
-    inOrderFields: ["Word", "Translation", "Context", "Source", "AddReverse", "Forms"],
+    // Forms/Example are last: modelFieldAdd appends, so migrated models match new ones
+    inOrderFields: ["Word", "Translation", "Context", "Source", "AddReverse", "Forms", "Example"],
     css: CARD_CSS,
     isCloze: false,
     cardTemplates: [
       {
         Name: "Word → Translation",
         Front: `<div class="word">{{Word}}</div>${tts}`,
-        Back: `{{FrontSide}}<hr id="answer"><div class="translation">{{Translation}}</div><div class="forms">{{Forms}}</div><div class="context">{{Context}}</div>`,
+        Back: `{{FrontSide}}<hr id="answer"><div class="translation">{{Translation}}</div><div class="forms">{{Forms}}</div><div class="context">{{Context}}</div><div class="example">{{Example}}</div>`,
       },
       {
         Name: "Translation → Word",
         Front: `{{#AddReverse}}<div class="word">{{Translation}}</div>{{/AddReverse}}`,
-        Back: `{{FrontSide}}<hr id="answer"><div class="translation">{{Word}}</div>${tts}<div class="forms">{{Forms}}</div><div class="context">{{Context}}</div>`,
+        Back: `{{FrontSide}}<hr id="answer"><div class="translation">{{Word}}</div>${tts}<div class="forms">{{Forms}}</div><div class="context">{{Context}}</div><div class="example">{{Example}}</div>`,
       },
     ],
   };
@@ -75,7 +76,7 @@ function boldWord(contextEscaped, wordEscaped) {
 
 // matchWord: the text as it appeared on the page (for bolding/cloze) when
 // `word` was normalized to a dictionary headword by the AI provider.
-function buildNoteFields({ word, translation, context, source, reverse, matchWord, forms }) {
+function buildNoteFields({ word, translation, context, source, reverse, matchWord, forms, example }) {
   const w = escapeHtml(String(word).trim());
   const m = escapeHtml(String(matchWord ?? word).trim());
   return {
@@ -85,6 +86,7 @@ function buildNoteFields({ word, translation, context, source, reverse, matchWor
     Source: escapeHtml(String(source ?? "")),
     AddReverse: reverse ? "y" : "",
     Forms: escapeHtml(String(forms ?? "").trim()),
+    Example: escapeHtml(String(example ?? "").trim()),
   };
 }
 

@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS = {
   autoTranslate: true, targetLang: "ru",
   engine: "google",                   // "google" | "deepl" | "ai" — сhosen translation engine
   deeplKey: "",
-  aiBaseUrl: "", aiModel: "", aiKey: "", aiExtra: "",
+  aiBaseUrl: "", aiModel: "", aiKey: "", aiExtra: "", aiExample: false,
   ttsLang: "off",                     // Anki tts lang tag: "off" | "de_DE" | "en_US" | …
   modelTtsLang: null,                 // internal: tts lang the main model was built with
 };
@@ -58,13 +58,16 @@ async function ensureModel() {
     await ankiFetch("createModel", def);
     await patchSettings({ modelTtsLang: s.ttsLang });
   } else {
-    // migration: older installs lack the Forms field
+    // migration: older installs lack the Forms/Example fields
     const fields = await ankiFetch("modelFieldNames", { modelName: AnkiClient.MODEL_NAME });
-    const addForms = !fields.includes("Forms");
-    if (addForms) {
-      await ankiFetch("modelFieldAdd", { modelName: AnkiClient.MODEL_NAME, fieldName: "Forms" });
+    let added = false;
+    for (const f of ["Forms", "Example"]) {
+      if (!fields.includes(f)) {
+        await ankiFetch("modelFieldAdd", { modelName: AnkiClient.MODEL_NAME, fieldName: f });
+        added = true;
+      }
     }
-    if (addForms || s.modelTtsLang !== s.ttsLang) {
+    if (added || s.modelTtsLang !== s.ttsLang) {
       await ankiFetch("updateModelTemplates", { model: { name: def.modelName, templates: templatesObj(def) } });
       await patchSettings({ modelTtsLang: s.ttsLang });
     }
@@ -162,7 +165,7 @@ const aiConfigured = (s) => s.aiBaseUrl?.trim() && s.aiModel?.trim();
 // translation + short grammar note. Never throws — failures bubble up so the
 // caller can fall back to a plain translator.
 async function aiTranslate(s, text, context) {
-  const req = Translator.buildAiRequest(s.aiBaseUrl, s.aiModel, s.aiKey, text, context ?? "", s.targetLang, s.aiExtra);
+  const req = Translator.buildAiRequest(s.aiBaseUrl, s.aiModel, s.aiKey, text, context ?? "", s.targetLang, s.aiExtra, s.aiExample);
   const res = await fetchWithTimeout(req.url, req.options, 20000);
   if (!res.ok) throw new Error(`AI HTTP ${res.status}`);
   const out = Translator.parseAiResponse(await res.json());
