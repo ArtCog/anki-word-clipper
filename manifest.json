@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Anki Word Clipper",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Быстро добавляет выделенное слово с контекстом предложения в Anki через AnkiConnect. Опционально: перевод и словарная форма через Google/DeepL/ИИ.",
   "permissions": ["storage", "contextMenus", "activeTab"],
   "host_permissions": [
