@@ -66,6 +66,8 @@ async function init() {
   $("engines").hidden = !$("autotr").checked;
   $("engine").value = s.engine ?? "google";
   showEngine($("engine").value);
+  $("targetlang").value = s.targetLang ?? "ru";
+  $("level").value = s.level ?? "";
 
   $("deeplkey").value = s.deeplKey ?? "";
   $("aiurl").value = s.aiBaseUrl ?? "";
@@ -94,6 +96,8 @@ async function init() {
     showEngine($("engine").value);
     set({ engine: $("engine").value });
   });
+  $("targetlang").addEventListener("change", () => set({ targetLang: $("targetlang").value }));
+  $("level").addEventListener("change", () => set({ level: $("level").value }));
 
   $("deeplkey").addEventListener("change", () => set({ deeplKey: $("deeplkey").value.trim() }));
   $("aipreset").addEventListener("change", () => {

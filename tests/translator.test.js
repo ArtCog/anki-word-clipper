@@ -2,6 +2,16 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const T = require("../translator.js");
 
+const wrap = (content) => ({ choices: [{ message: { content } }] });
+const ai = (over = {}) =>
+  T.buildAiRequest({
+    baseUrl: "https://x/v1", model: "m", apiKey: "k",
+    word: "w", context: "", targetLang: "ru",
+    ...over,
+  });
+const userOf = (r) => JSON.parse(r.options.body).messages.find((m) => m.role === "user").content;
+const sysOf = (r) => JSON.parse(r.options.body).messages[0].content;
+
 test("buildGoogleUrl encodes text and target language", () => {
   const url = T.buildGoogleUrl("die Herausforderung", "ru");
   assert.ok(url.startsWith("https://translate.googleapis.com/translate_a/single?"));
@@ -38,24 +48,22 @@ test("parseDeepLResponse extracts text or null", () => {
 });
 
 test("buildAiRequest targets chat/completions with bearer key and both word and context", () => {
-  const r = T.buildAiRequest("https://openrouter.ai/api/v1/", "google/gemini-2.5-flash", "sk-or-abc", "Häusern", "In den Häusern ist es warm.", "ru");
+  const r = ai({ baseUrl: "https://openrouter.ai/api/v1/", model: "google/gemini-2.5-flash", apiKey: "sk-or-abc", word: "Häusern", context: "In den Häusern ist es warm." });
   assert.equal(r.url, "https://openrouter.ai/api/v1/chat/completions");
   assert.equal(r.options.headers.Authorization, "Bearer sk-or-abc");
   const body = JSON.parse(r.options.body);
   assert.equal(body.model, "google/gemini-2.5-flash");
   assert.equal(body.temperature, 0);
-  const user = body.messages.find((m) => m.role === "user").content;
-  assert.ok(user.includes("Häusern"));
-  assert.ok(user.includes("In den Häusern ist es warm."));
+  assert.ok(userOf(r).includes("Häusern"));
+  assert.ok(userOf(r).includes("In den Häusern ist es warm."));
 });
 
 test("buildAiRequest omits Authorization without key (Ollama)", () => {
-  const r = T.buildAiRequest("http://localhost:11434/v1", "qwen3:8b", "", "Haus", "", "ru");
+  const r = ai({ baseUrl: "http://localhost:11434/v1", model: "qwen3:8b", apiKey: "" });
   assert.equal(r.options.headers.Authorization, undefined);
 });
 
 test("parseAiResponse parses plain and fenced JSON", () => {
-  const wrap = (content) => ({ choices: [{ message: { content } }] });
   const plain = T.parseAiResponse(wrap('{"headword":"das Haus, die Häuser","translation":"дом","note":"n, сущ."}'));
   assert.deepEqual(plain, { headword: "das Haus, die Häuser", forms: null, translation: "дом", note: "n, сущ.", example: null });
   const fenced = T.parseAiResponse(wrap('```json\n{"headword":"","translation":"дом","note":""}\n```'));
@@ -67,38 +75,64 @@ test("parseAiResponse parses plain and fenced JSON", () => {
 });
 
 test("system prompt teaches verb principal forms; extra instructions are appended", () => {
-  const r = T.buildAiRequest("https://x/v1", "m", "k", "ging", "Er ging heim.", "ru");
-  const sys = JSON.parse(r.options.body).messages[0].content;
+  const sys = sysOf(ai({ word: "ging", context: "Er ging heim." }));
   assert.ok(sys.includes("sprechen (spricht), sprach, hat gesprochen"));
   assert.ok(sys.includes("go, went, gone"));
-  const r2 = T.buildAiRequest("https://x/v1", "m", "k", "w", "", "ru", "always add IPA");
-  const sys2 = JSON.parse(r2.options.body).messages[0].content;
+  assert.ok(sys.includes("Rektion"));
+  const sys2 = sysOf(ai({ extra: "always add IPA" }));
   assert.ok(sys2.includes("always add IPA"));
 });
 
 test("parseAiResponse passes verb forms through", () => {
-  const wrap = (content) => ({ choices: [{ message: { content } }] });
   const r = T.parseAiResponse(wrap('{"headword":"verzögern","forms":"verzögern, verzögerte, hat verzögert","translation":"задерживать","note":"глагол"}'));
   assert.equal(r.forms, "verzögern, verzögerte, hat verzögert");
   assert.equal(T.parseAiResponse(wrap('{"translation":"дом"}')).forms, null);
 });
 
 test("example key: requested via flag, parsed from response", () => {
-  const withEx = T.buildAiRequest("https://x/v1", "m", "k", "w", "", "ru", "", true);
-  assert.ok(JSON.parse(withEx.options.body).messages[0].content.includes('"example"'));
-  const without = T.buildAiRequest("https://x/v1", "m", "k", "w", "", "ru", "", false);
-  assert.ok(!JSON.parse(without.options.body).messages[0].content.includes('"example"'));
-  const wrap = (content) => ({ choices: [{ message: { content } }] });
+  assert.ok(sysOf(ai({ wantExample: true })).includes('"example"'));
+  assert.ok(!sysOf(ai({ wantExample: false })).includes('"example"'));
   const r = T.parseAiResponse(wrap('{"translation":"дом","example":"Das Haus ist alt."}'));
   assert.equal(r.example, "Das Haus ist alt.");
 });
 
 test("wider context reaches the user message only when it adds information", () => {
-  const r = T.buildAiRequest("https://x/v1", "m", "k", "Bank", "Er saß auf der Bank.", "ru", "", false,
-    "Der Park war leer. Er saß auf der Bank. Die Enten schwammen vorbei.");
-  const user = JSON.parse(r.options.body).messages.find((m) => m.role === "user").content;
-  assert.ok(user.includes("Wider context: Der Park war leer."));
-  const same = T.buildAiRequest("https://x/v1", "m", "k", "Bank", "Satz.", "ru", "", false, "Satz.");
-  const user2 = JSON.parse(same.options.body).messages.find((m) => m.role === "user").content;
-  assert.ok(!user2.includes("Wider context"));
+  const r = ai({ word: "Bank", context: "Er saß auf der Bank.", wide: "Der Park war leer. Er saß auf der Bank. Die Enten schwammen vorbei." });
+  assert.ok(userOf(r).includes("Wider context: Der Park war leer."));
+  const same = ai({ word: "Bank", context: "Satz.", wide: "Satz." });
+  assert.ok(!userOf(same).includes("Wider context"));
+});
+
+test("learner level and reroll (avoid) shape the request", () => {
+  const lvl = ai({ level: "C1" });
+  assert.ok(userOf(lvl).includes("Learner level: C1"));
+  assert.equal(JSON.parse(lvl.options.body).temperature, 0);
+
+  const rr = ai({ avoid: "может" });
+  assert.ok(userOf(rr).includes("not: может"));
+  assert.equal(JSON.parse(rr.options.body).temperature, 0.7);
+
+  assert.ok(!userOf(ai()).includes("Learner level"));
+});
+
+test("batch request carries text, level and target language", () => {
+  const r = T.buildBatchRequest({ baseUrl: "https://x/v1", model: "m", apiKey: "k", text: "Ein langer Absatz.", targetLang: "ru", level: "B2", extra: "" });
+  assert.equal(r.url, "https://x/v1/chat/completions");
+  const user = userOf(r);
+  assert.ok(user.includes("Ein langer Absatz."));
+  assert.ok(user.includes("Learner level: B2"));
+  assert.ok(sysOf(r).includes('"items"'));
+});
+
+test("parseBatchResponse validates, filters and caps items", () => {
+  const good = T.parseBatchResponse(wrap(JSON.stringify({ items: [
+    { word: "ertüchtigen", headword: "ertüchtigen", forms: "ertüchtigen (ertüchtigt), ertüchtigte, hat ertüchtigt", translation: "укреплять", note: "" },
+    { word: "", headword: "x", forms: "", translation: "пусто", note: "" },
+    { word: "ohne", headword: "", forms: "", translation: "", note: "" },
+  ] })));
+  assert.equal(good.length, 1);
+  assert.equal(good[0].word, "ertüchtigen");
+  assert.equal(T.parseBatchResponse(wrap('{"items":[]}')), null);
+  assert.equal(T.parseBatchResponse(wrap("мусор")), null);
+  assert.equal(T.parseBatchResponse(null), null);
 });

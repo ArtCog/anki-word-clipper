@@ -8,7 +8,7 @@ const ANKI_URL = "http://127.0.0.1:8765";
 const DEFAULT_SETTINGS = {
   lastDeck: null, instantMode: false,
   defaultCardType: "basic",           // "basic" | "reverse" | "cloze"
-  autoTranslate: true, targetLang: "ru",
+  autoTranslate: true, targetLang: "ru", level: "",
   engine: "google",                   // "google" | "deepl" | "ai" — сhosen translation engine
   deeplKey: "",
   aiBaseUrl: "", aiModel: "", aiKey: "", aiExtra: "", aiExample: false,
@@ -164,13 +164,38 @@ const aiConfigured = (s) => s.aiBaseUrl?.trim() && s.aiModel?.trim();
 // AI provider: context-aware. Returns dictionary headword + contextual
 // translation + short grammar note. Never throws — failures bubble up so the
 // caller can fall back to a plain translator.
-async function aiTranslate(s, text, context, wide) {
-  const req = Translator.buildAiRequest(s.aiBaseUrl, s.aiModel, s.aiKey, text, context ?? "", s.targetLang, s.aiExtra, s.aiExample, wide ?? "");
+async function aiTranslate(s, text, context, wide, avoid) {
+  const req = Translator.buildAiRequest({
+    baseUrl: s.aiBaseUrl, model: s.aiModel, apiKey: s.aiKey,
+    word: text, context: context ?? "", wide: wide ?? "", avoid: avoid ?? "",
+    targetLang: s.targetLang, level: s.level, extra: s.aiExtra, wantExample: s.aiExample,
+  });
   const res = await fetchWithTimeout(req.url, req.options, 20000);
   if (!res.ok) throw new Error(`AI HTTP ${res.status}`);
   const out = Translator.parseAiResponse(await res.json());
   if (!out) throw new Error("AI: пустой/некорректный ответ");
-  return { ok: true, provider: "ai", ...out }; // {translation, headword, note}
+  return { ok: true, provider: "ai", ...out }; // {translation, headword, forms, note, example}
+}
+
+// Batch: pick learnable words from a passage. AI-only — no fallback makes sense.
+async function batchExtract(text) {
+  const s = await getSettings();
+  if (s.engine !== "ai" || !aiConfigured(s)) {
+    return { ok: false, code: "AI_REQUIRED", message: "Пакетный разбор работает только с движком «ИИ» — включи его в попапе." };
+  }
+  try {
+    const req = Translator.buildBatchRequest({
+      baseUrl: s.aiBaseUrl, model: s.aiModel, apiKey: s.aiKey,
+      text, targetLang: s.targetLang, level: s.level, extra: s.aiExtra,
+    });
+    const res = await fetchWithTimeout(req.url, req.options, 30000);
+    if (!res.ok) throw new Error(`AI HTTP ${res.status}`);
+    const items = Translator.parseBatchResponse(await res.json());
+    if (!items) throw new Error("ИИ не вернул список слов");
+    return { ok: true, items };
+  } catch (e) {
+    return { ok: false, code: "UNKNOWN", message: String(e?.message ?? e) };
+  }
 }
 
 async function deeplTranslate(s, text) {
@@ -193,7 +218,7 @@ async function googleTranslate(s, text) {
 // Translation is a convenience: any failure returns ok:false and the caller
 // proceeds with an empty translation instead of blocking the card.
 // Engine hierarchy: the chosen engine runs first; Google is the safety net.
-async function translate(text, context, wide) {
+async function translate(text, context, wide, avoid) {
   const s = await getSettings();
   if (!s.autoTranslate || !text?.trim()) return { ok: false, code: "DISABLED", message: "" };
   // fall back to Google when the chosen engine can't answer — but tell the
@@ -205,7 +230,7 @@ async function translate(text, context, wide) {
     fallbackError = "нет DeepL-ключа — открой попап расширения";
   } else {
     try {
-      if (s.engine === "ai") return await aiTranslate(s, text, context, wide);
+      if (s.engine === "ai") return await aiTranslate(s, text, context, wide, avoid);
       if (s.engine === "deepl") return await deeplTranslate(s, text);
     } catch (e) {
       fallbackError = String(e?.message ?? e);
@@ -251,7 +276,8 @@ async function handleMessage(msg) {
     case "CHECK_CONNECTION": return check();
     case "GET_DECKS": return getDecks();
     case "ADD_NOTE": return addNote(msg.note);
-    case "TRANSLATE": return translate(msg.text, msg.context, msg.wide);
+    case "TRANSLATE": return translate(msg.text, msg.context, msg.wide, msg.avoid);
+    case "BATCH": return batchExtract(msg.text);
     case "TEST_AI": return testAi();
     case "GET_SETTINGS": return { ok: true, settings: await getSettings() };
     case "SET_SETTINGS":

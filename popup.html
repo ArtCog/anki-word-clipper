@@ -93,6 +93,30 @@
     <div class="sec-body">
       <label class="check"><input type="checkbox" id="autotr"> Автоперевод выделенного слова</label>
       <div id="engines">
+        <label class="field">Переводить на
+          <select id="targetlang">
+            <option value="ru">русский</option>
+            <option value="en">английский</option>
+            <option value="de">немецкий</option>
+            <option value="uk">украинский</option>
+            <option value="fr">французский</option>
+            <option value="es">испанский</option>
+            <option value="it">итальянский</option>
+            <option value="pl">польский</option>
+            <option value="tr">турецкий</option>
+          </select>
+        </label>
+        <label class="field">Мой уровень языка (ИИ подстроит перевод и подсказки)
+          <select id="level">
+            <option value="">не задан</option>
+            <option value="A1">A1</option>
+            <option value="A2">A2</option>
+            <option value="B1">B1</option>
+            <option value="B2">B2</option>
+            <option value="C1">C1</option>
+            <option value="C2">C2</option>
+          </select>
+        </label>
         <label class="field">Движок перевода
           <select id="engine">
             <option value="google">Google — из коробки, без настройки</option>

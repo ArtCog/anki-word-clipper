@@ -1,6 +1,7 @@
 (() => {
   const api = globalThis.browser ?? globalThis.chrome;
-  const MAX_SEL_LEN = 500;
+  const MAX_SEL_LEN = 2000; // long selections go to batch mode
+  const BATCH_MIN = 120;    // selection length that switches to batch mode
 
   const ERROR_TEXT = {
     ANKI_UNREACHABLE: "Anki недоступен — запусти Anki с AnkiConnect",
@@ -55,6 +56,14 @@
     }
     textarea { resize: vertical; min-height: 44px; transition: height .12s; }
     input:focus, textarea:focus, select:focus { outline: none; border-color: #3CE5B0; }
+    .wc-rr { background: none; border: 0; color: #3CE5B0; cursor: pointer; font-size: 12px; padding: 0 2px; opacity: .8; }
+    .wc-rr:hover { opacity: 1; }
+    .wc-b-list { max-height: 260px; overflow-y: auto; margin-top: 6px; }
+    .wc-b-list label { all: unset; display: flex; gap: 7px; align-items: flex-start; font-size: 12px; margin: 7px 0; cursor: pointer; }
+    .wc-b-list input { margin-top: 2px; }
+    .wc-b-list b { color: #3CE5B0; font-weight: 600; }
+    .wc-b-list .tr { opacity: .9; }
+    .wc-b-list .nt { opacity: .55; font-size: 11px; }
     .wc-note { font-size: 11px; color: #7bdcc0; opacity: .95; margin: 5px 0 0; }
     .wc-note:empty { display: none; }
     .wc-example { font-size: 11px; font-style: italic; opacity: .7; margin: 4px 0 0; }
@@ -78,9 +87,11 @@
     .wc-toast button { background: none; border: 0; color: #3CE5B0; cursor: pointer; font-size: 13px; text-decoration: underline; padding: 0; }
   `;
 
-  let host, shadow, btn, form, toast, toastTimer;
+  let host, shadow, btn, form, batch, toast, toastTimer;
   let lastCapture = null;
   let currentCapture = null;
+  let batchItems = [];
+  let batchCapture = null;
 
   const q = (sel) => form.querySelector(sel);
 
@@ -159,7 +170,7 @@
     form.innerHTML = `
       <div class="wc-head"><span>+ Anki</span><button class="wc-x" title="Закрыть">×</button></div>
       <label>Слово / фраза</label><input type="text" class="wc-word">
-      <label>Перевод / пояснение</label><input type="text" class="wc-tr" placeholder="можно оставить пустым">
+      <label>Перевод / пояснение <button class="wc-rr" title="Перевести заново (другой вариант)">↻</button></label><input type="text" class="wc-tr" placeholder="можно оставить пустым">
       <div class="wc-note"></div>
       <label>Контекст</label><textarea class="wc-ctx" rows="2"></textarea>
       <div class="wc-example"></div>
@@ -173,6 +184,12 @@
     `;
     form.querySelector(".wc-x").addEventListener("click", closeForm);
     form.querySelector(".wc-add").addEventListener("click", () => submit(false));
+    form.querySelector(".wc-rr").addEventListener("click", (e) => {
+      e.preventDefault();
+      const avoid = q(".wc-tr").value;
+      trEdited = false;
+      requestTranslation(q(".wc-word").value, avoid);
+    });
 
     // re-translate when the word is edited by hand; stop auto-filling once
     // the user typed their own translation
@@ -222,10 +239,26 @@
       }
     });
 
+    batch = document.createElement("div");
+    batch.className = "wc-form wc-batch";
+    batch.innerHTML = `
+      <div class="wc-head"><span>+ Anki · разбор текста</span><button class="wc-x" title="Закрыть">×</button></div>
+      <div class="wc-status"></div>
+      <div class="wc-b-list"></div>
+      <label>Колода</label><select class="wc-deck"></select>
+      <div class="wc-row"><button class="wc-add">Добавить выбранные</button><span class="wc-b-count"></span></div>
+    `;
+    batch.querySelector(".wc-x").addEventListener("click", closeBatch);
+    batch.querySelector(".wc-add").addEventListener("click", submitBatch);
+    batch.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Escape") closeBatch();
+    });
+
     toast = document.createElement("div");
     toast.className = "wc-toast";
 
-    shadow.append(style, btn, form, toast);
+    shadow.append(style, btn, form, batch, toast);
     document.documentElement.append(host);
   }
 
@@ -233,10 +266,11 @@
 
   function hideButton() { if (btn) btn.classList.remove("show"); }
   const formOpen = () => form?.classList.contains("show");
+  const batchOpen = () => batch?.classList.contains("show");
 
   function maybeShowButton() {
     ensureUi();
-    if (formOpen()) return;
+    if (formOpen() || batchOpen()) return;
     setTimeout(() => {
       const cap = capture();
       if (!cap) { hideButton(); return; }
@@ -257,9 +291,12 @@
     const sel = window.getSelection();
     if ((!sel || sel.isCollapsed) && !formOpen()) hideButton();
   });
-  // click anywhere outside the form closes it
+  // click anywhere outside the form/batch panel closes it
   document.addEventListener("mousedown", (e) => {
-    if (formOpen() && !e.composedPath().includes(host)) closeForm();
+    if (!e.composedPath().includes(host)) {
+      if (formOpen()) closeForm();
+      if (batchOpen()) closeBatch();
+    }
   }, true);
   window.addEventListener("scroll", hideButton, { passive: true, capture: true });
 
@@ -276,6 +313,7 @@
   async function openForm(cap) {
     if (!cap) return;
     ensureUi();
+    if (cap.word.length >= BATCH_MIN) return openBatch(cap); // whole passage → batch mode
     currentCapture = cap;
     trEdited = false;
     aiForms = "";
@@ -328,12 +366,13 @@
   let trEdited = false;  // user typed their own translation — never overwrite it
   let aiForms = "";      // verb principal forms from the AI — saved into the Forms field
   let aiExample = "";    // optional AI example sentence — saved into the Example field
-  async function requestTranslation(word) {
+  async function requestTranslation(word, avoid = "") {
     if (!word?.trim()) return;
     const seq = ++translateSeq;
     const tr = q(".wc-tr");
+    if (avoid) tr.value = "";
     tr.placeholder = "перевожу…";
-    const res = await send({ type: "TRANSLATE", text: word, context: q(".wc-ctx").value, wide: currentCapture?.wideContext ?? "" });
+    const res = await send({ type: "TRANSLATE", text: word, context: q(".wc-ctx").value, wide: currentCapture?.wideContext ?? "", avoid });
     if (seq !== translateSeq || !formOpen()) return;
     tr.placeholder = "можно оставить пустым";
     if (!res.ok) return;
@@ -401,6 +440,7 @@
   async function instantAdd(cap, allowDuplicate = false) {
     if (!cap) return;
     ensureUi();
+    if (cap.word.length >= BATCH_MIN) return openBatch(cap); // batch is always interactive
     const st = await send({ type: "GET_SETTINGS" });
     const deck = st?.settings?.lastDeck;
     if (!deck) { openForm(cap); return; } // first ever use: no deck yet — fall back to form
@@ -424,6 +464,99 @@
     else if (res.code === "DUPLICATE" && !allowDuplicate) {
       showToast("Уже есть в колоде", { label: "Добавить всё равно", fn: () => instantAdd(cap, true) });
     } else showToast(errText(res));
+  }
+
+  // ---------- batch mode: whole passage → list of learnable words ----------
+
+  const bq = (sel) => batch.querySelector(sel);
+
+  function closeBatch() {
+    batch?.classList.remove("show");
+    batchItems = [];
+    batchCapture = null;
+  }
+
+  async function openBatch(cap) {
+    batchCapture = cap;
+    hideButton();
+    const left = Math.max(8, Math.min(cap.rect.left, innerWidth - 336));
+    const top = Math.max(8, Math.min(cap.rect.bottom + 8, innerHeight - 420));
+    batch.style.left = `${left}px`;
+    batch.style.top = `${top}px`;
+    batch.classList.add("show");
+    bq(".wc-b-list").innerHTML = "";
+    bq(".wc-b-count").textContent = "";
+    bq(".wc-status").textContent = "ИИ выбирает слова, стоящие изучения…";
+    bq(".wc-add").disabled = true;
+
+    // decks in parallel with the AI call
+    send({ type: "GET_DECKS" }).then((res) => {
+      const deckSel = bq(".wc-deck");
+      deckSel.innerHTML = "";
+      if (!res.ok) { deckSel.innerHTML = "<option value=''>—</option>"; return; }
+      for (const d of res.decks) {
+        const o = document.createElement("option");
+        o.value = o.textContent = d;
+        deckSel.append(o);
+      }
+      if (res.lastDeck && res.decks.includes(res.lastDeck)) deckSel.value = res.lastDeck;
+    });
+
+    const res = await send({ type: "BATCH", text: cap.word });
+    if (!batch.classList.contains("show")) return;
+    if (!res.ok) {
+      bq(".wc-status").textContent = res.message ?? "Не получилось";
+      return;
+    }
+    batchItems = res.items;
+    bq(".wc-status").textContent = "Выбери, что добавить:";
+    const list = bq(".wc-b-list");
+    res.items.forEach((it, i) => {
+      const row = document.createElement("label");
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = true;
+      cb.dataset.i = i;
+      const txt = document.createElement("span");
+      txt.innerHTML = `<b></b> — <span class="tr"></span> <span class="nt"></span>`;
+      txt.querySelector("b").textContent = it.headword || it.word;
+      txt.querySelector(".tr").textContent = it.translation;
+      txt.querySelector(".nt").textContent = [it.forms, it.note].filter(Boolean).join(" · ");
+      row.append(cb, txt);
+      list.append(row);
+    });
+    bq(".wc-add").disabled = false;
+  }
+
+  // each word gets its own sentence from the selected passage as card context
+  function sentenceFor(passage, word) {
+    const idx = passage.toLowerCase().indexOf(word.toLowerCase());
+    if (idx === -1) return "";
+    const c = ContextExtract.extractContext(passage, idx, idx + word.length);
+    return (c.before + c.word + c.after).replace(/\s+/g, " ").trim();
+  }
+
+  async function submitBatch() {
+    const deck = bq(".wc-deck").value;
+    if (!deck) { bq(".wc-status").textContent = "Выбери колоду"; return; }
+    const checked = [...bq(".wc-b-list").querySelectorAll("input:checked")].map((cb) => batchItems[cb.dataset.i]);
+    if (!checked.length) { bq(".wc-status").textContent = "Ничего не выбрано"; return; }
+    bq(".wc-add").disabled = true;
+    let added = 0, dup = 0, failed = 0;
+    for (const it of checked) {
+      bq(".wc-b-count").textContent = `${added + dup + failed + 1}/${checked.length}…`;
+      const res = await send({ type: "ADD_NOTE", note: {
+        word: it.headword || it.word, matchWord: it.word,
+        translation: it.translation, forms: it.forms, example: "",
+        context: sentenceFor(batchCapture?.word ?? "", it.word),
+        source: batchCapture?.source ?? "", cardType: "basic", deck, allowDuplicate: false,
+      } });
+      if (res.ok) added++;
+      else if (res.code === "DUPLICATE") dup++;
+      else failed++;
+    }
+    closeBatch();
+    showToast(`Добавлено: ${added}${dup ? `, уже было: ${dup}` : ""}${failed ? `, ошибок: ${failed}` : ""}`);
   }
 
   // ---------- toast ----------
