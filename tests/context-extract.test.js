@@ -58,3 +58,13 @@ test("long context is capped near maxLen with ellipses", () => {
   assert.ok(c.after.endsWith("…"));
   assert.equal(c.word, "mitte");
 });
+
+test("sentences=2 captures one neighbouring sentence on each side", () => {
+  const text = "Der Park war leer. Er saß auf der Bank. Die Enten schwammen vorbei. Es wurde dunkel.";
+  const start = text.indexOf("Bank");
+  const c = extractContext(text, start, start + 4, 700, 2);
+  const full = c.before + c.word + c.after;
+  assert.ok(full.includes("Der Park war leer."));
+  assert.ok(full.includes("Die Enten schwammen vorbei."));
+  assert.ok(!full.includes("Es wurde dunkel."));
+});

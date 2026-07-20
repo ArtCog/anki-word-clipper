@@ -164,8 +164,8 @@ const aiConfigured = (s) => s.aiBaseUrl?.trim() && s.aiModel?.trim();
 // AI provider: context-aware. Returns dictionary headword + contextual
 // translation + short grammar note. Never throws — failures bubble up so the
 // caller can fall back to a plain translator.
-async function aiTranslate(s, text, context) {
-  const req = Translator.buildAiRequest(s.aiBaseUrl, s.aiModel, s.aiKey, text, context ?? "", s.targetLang, s.aiExtra, s.aiExample);
+async function aiTranslate(s, text, context, wide) {
+  const req = Translator.buildAiRequest(s.aiBaseUrl, s.aiModel, s.aiKey, text, context ?? "", s.targetLang, s.aiExtra, s.aiExample, wide ?? "");
   const res = await fetchWithTimeout(req.url, req.options, 20000);
   if (!res.ok) throw new Error(`AI HTTP ${res.status}`);
   const out = Translator.parseAiResponse(await res.json());
@@ -193,7 +193,7 @@ async function googleTranslate(s, text) {
 // Translation is a convenience: any failure returns ok:false and the caller
 // proceeds with an empty translation instead of blocking the card.
 // Engine hierarchy: the chosen engine runs first; Google is the safety net.
-async function translate(text, context) {
+async function translate(text, context, wide) {
   const s = await getSettings();
   if (!s.autoTranslate || !text?.trim()) return { ok: false, code: "DISABLED", message: "" };
   // fall back to Google when the chosen engine can't answer — but tell the
@@ -205,7 +205,7 @@ async function translate(text, context) {
     fallbackError = "нет DeepL-ключа — открой попап расширения";
   } else {
     try {
-      if (s.engine === "ai") return await aiTranslate(s, text, context);
+      if (s.engine === "ai") return await aiTranslate(s, text, context, wide);
       if (s.engine === "deepl") return await deeplTranslate(s, text);
     } catch (e) {
       fallbackError = String(e?.message ?? e);
@@ -251,7 +251,7 @@ async function handleMessage(msg) {
     case "CHECK_CONNECTION": return check();
     case "GET_DECKS": return getDecks();
     case "ADD_NOTE": return addNote(msg.note);
-    case "TRANSLATE": return translate(msg.text, msg.context);
+    case "TRANSLATE": return translate(msg.text, msg.context, msg.wide);
     case "TEST_AI": return testAi();
     case "GET_SETTINGS": return { ok: true, settings: await getSettings() };
     case "SET_SETTINGS":

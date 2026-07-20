@@ -116,15 +116,20 @@
   function capture() {
     const info = selectionInfo();
     if (!info) return null;
-    let context = "";
+    let context = "", wideContext = "";
     const block = blockTextAround(info.range);
     if (block) {
       const c = ContextExtract.extractContext(block.text, block.selStart, block.selEnd);
       context = (c.before + c.word + c.after).replace(/\s+/g, " ").trim();
+      // ±1 sentence around — goes to the AI for disambiguation, not to the card
+      // ponytail: window is limited to the same block element; cross-paragraph neighbours are out
+      const w = ContextExtract.extractContext(block.text, block.selStart, block.selEnd, 700, 2);
+      wideContext = (w.before + w.word + w.after).replace(/\s+/g, " ").trim();
     }
     return {
       word: info.text,
       context,
+      wideContext,
       source: `${document.title} — ${location.href}`,
       rect: info.range.getBoundingClientRect(),
     };
@@ -328,7 +333,7 @@
     const seq = ++translateSeq;
     const tr = q(".wc-tr");
     tr.placeholder = "перевожу…";
-    const res = await send({ type: "TRANSLATE", text: word, context: q(".wc-ctx").value });
+    const res = await send({ type: "TRANSLATE", text: word, context: q(".wc-ctx").value, wide: currentCapture?.wideContext ?? "" });
     if (seq !== translateSeq || !formOpen()) return;
     tr.placeholder = "можно оставить пустым";
     if (!res.ok) return;
@@ -402,7 +407,7 @@
     let cardType = st.settings.defaultCardType ?? "basic";
     if (cardType === "cloze" && !cap.context) cardType = "basic"; // no sentence → no gap
     let word = cap.word, translation = "", forms = "", example = "";
-    const tr = await send({ type: "TRANSLATE", text: cap.word, context: cap.context });
+    const tr = await send({ type: "TRANSLATE", text: cap.word, context: cap.context, wide: cap.wideContext ?? "" });
     if (tr.ok) {
       translation = tr.translation;
       forms = tr.forms ?? "";

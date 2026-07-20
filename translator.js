@@ -44,18 +44,20 @@ const AI_SYSTEM_PROMPT =
   '"headword" — the dictionary form: ' +
   'German nouns → article + plural (e.g. "das Haus, die Häuser"); ' +
   "other words → plain base form; empty string if not applicable. " +
-  '"forms" — for verbs ONLY, the Stammformen "Infinitiv, Präteritum, Partizip II with auxiliary": ' +
-  'e.g. "gehen, ging, ist gegangen"; if 3rd-person-singular Präsens is irregular, add it in brackets ' +
-  'after the infinitive: "sprechen (spricht), sprach, hat gesprochen"; English irregular verbs: "go, went, gone"; ' +
+  '"forms" — for verbs ONLY, the Stammformen "Infinitiv, Präteritum, Partizip II with auxiliary", ' +
+  "ALWAYS with 3rd-person-singular Präsens in brackets after the infinitive: " +
+  '"sprechen (spricht), sprach, hat gesprochen", "gehen (geht), ging, ist gegangen"; ' +
+  'English irregular verbs: "go, went, gone"; ' +
   "empty string for everything that is not a verb. Forms must be dictionary-accurate. " +
-  '"translation" — concise translation into the target language, the meaning IN THIS CONTEXT. ' +
+  '"translation" — concise translation into the target language, the meaning IN THIS CONTEXT ' +
+  "(use the wider context, when given, to disambiguate — never translate the word in isolation). " +
   '"note" — very short human-readable grammar hint written in the TARGET language ' +
   '(e.g. "гл., отделяемая приставка", "прил.", "модальный глагол"); no dictionary codes like "m, -(e)s, -e"; ' +
   "for nouns do NOT repeat gender/article/plural — they are already in headword; " +
   'when helpful append 1–2 simpler synonyms in the SOURCE language (e.g. "≈ verbessern, stärken"); may be empty. ' +
   "Keep it compact. Never add commentary.";
 
-function buildAiRequest(baseUrl, model, apiKey, word, context, targetLang, extraInstructions, wantExample) {
+function buildAiRequest(baseUrl, model, apiKey, word, context, targetLang, extraInstructions, wantExample, wideContext) {
   const base = String(baseUrl).replace(/\/+$/, "");
   const headers = { "Content-Type": "application/json" };
   const key = String(apiKey ?? "").trim();
@@ -66,9 +68,11 @@ function buildAiRequest(baseUrl, model, apiKey, word, context, targetLang, extra
   }
   const extra = String(extraInstructions ?? "").trim();
   if (extra) sys += `\nAdditional user instructions (they win over the defaults above): ${extra}`;
+  const wide = String(wideContext ?? "").trim();
   const userMsg =
     `Target language: ${targetLang}\nWord or phrase: ${word}\n` +
-    (context ? `Sentence: ${context}` : "Sentence: (none)");
+    (context ? `Sentence: ${context}` : "Sentence: (none)") +
+    (wide && wide !== context ? `\nWider context: ${wide}` : "");
   return {
     url: `${base}/chat/completions`,
     options: {

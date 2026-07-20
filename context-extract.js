@@ -40,14 +40,16 @@ function isBoundary(text, i) {
   return /[\p{Lu}\p{N}"'«„¿¡([-]/u.test(text[j]);
 }
 
-function extractContext(text, selStart, selEnd, maxLen = 300) {
-  let start = 0;
+// sentences: how many sentence boundaries to cross on each side (1 = the
+// sentence itself, 2 = plus one neighbouring sentence each side, …)
+function extractContext(text, selStart, selEnd, maxLen = 300, sentences = 1) {
+  let start = 0, foundL = 0;
   for (let i = selStart - 1; i >= 0; i--) {
-    if (isBoundary(text, i)) { start = i + 1; break; }
+    if (isBoundary(text, i) && ++foundL >= sentences) { start = i + 1; break; }
   }
-  let end = text.length;
+  let end = text.length, foundR = 0;
   for (let i = selEnd; i < text.length; i++) {
-    if (isBoundary(text, i)) { end = text[i] === "\n" ? i : i + 1; break; }
+    if (isBoundary(text, i) && ++foundR >= sentences) { end = text[i] === "\n" ? i : i + 1; break; }
   }
   let before = text.slice(start, selStart).replace(/^\s+/, "");
   const word = text.slice(selStart, selEnd);

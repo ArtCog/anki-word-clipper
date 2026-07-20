@@ -69,7 +69,7 @@ test("parseAiResponse parses plain and fenced JSON", () => {
 test("system prompt teaches verb principal forms; extra instructions are appended", () => {
   const r = T.buildAiRequest("https://x/v1", "m", "k", "ging", "Er ging heim.", "ru");
   const sys = JSON.parse(r.options.body).messages[0].content;
-  assert.ok(sys.includes("gehen, ging, ist gegangen"));
+  assert.ok(sys.includes("sprechen (spricht), sprach, hat gesprochen"));
   assert.ok(sys.includes("go, went, gone"));
   const r2 = T.buildAiRequest("https://x/v1", "m", "k", "w", "", "ru", "always add IPA");
   const sys2 = JSON.parse(r2.options.body).messages[0].content;
@@ -91,4 +91,14 @@ test("example key: requested via flag, parsed from response", () => {
   const wrap = (content) => ({ choices: [{ message: { content } }] });
   const r = T.parseAiResponse(wrap('{"translation":"дом","example":"Das Haus ist alt."}'));
   assert.equal(r.example, "Das Haus ist alt.");
+});
+
+test("wider context reaches the user message only when it adds information", () => {
+  const r = T.buildAiRequest("https://x/v1", "m", "k", "Bank", "Er saß auf der Bank.", "ru", "", false,
+    "Der Park war leer. Er saß auf der Bank. Die Enten schwammen vorbei.");
+  const user = JSON.parse(r.options.body).messages.find((m) => m.role === "user").content;
+  assert.ok(user.includes("Wider context: Der Park war leer."));
+  const same = T.buildAiRequest("https://x/v1", "m", "k", "Bank", "Satz.", "ru", "", false, "Satz.");
+  const user2 = JSON.parse(same.options.body).messages.find((m) => m.role === "user").content;
+  assert.ok(!user2.includes("Wider context"));
 });
