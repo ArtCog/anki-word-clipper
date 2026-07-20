@@ -44,9 +44,10 @@ const AI_SYSTEM_PROMPT =
   '"headword" — the dictionary form: ' +
   'German nouns → article + plural (e.g. "das Haus, die Häuser"); ' +
   "other words → plain base form; empty string if not applicable. " +
-  '"forms" — for verbs ONLY: the principal forms with auxiliary, comma-separated ' +
-  '(German e.g. "gehen, ging, ist gegangen"; English irregular e.g. "go, went, gone"); ' +
-  "empty string for everything that is not a verb. " +
+  '"forms" — for verbs ONLY, the Stammformen "Infinitiv, Präteritum, Partizip II with auxiliary": ' +
+  'e.g. "gehen, ging, ist gegangen"; if 3rd-person-singular Präsens is irregular, add it in brackets ' +
+  'after the infinitive: "sprechen (spricht), sprach, hat gesprochen"; English irregular verbs: "go, went, gone"; ' +
+  "empty string for everything that is not a verb. Forms must be dictionary-accurate. " +
   '"translation" — concise translation into the target language, the meaning IN THIS CONTEXT. ' +
   '"note" — very short human-readable grammar hint written in the TARGET language ' +
   '(e.g. "гл., отделяемая приставка", "прил.", "модальный глагол"); no dictionary codes like "m, -(e)s, -e"; ' +
