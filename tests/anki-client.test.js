@@ -67,7 +67,7 @@ test("interpretResponse", () => {
 });
 
 test("MODEL_DEF has conditional reverse template and exact fields", () => {
-  assert.deepEqual(A.MODEL_DEF.inOrderFields, ["Word", "Translation", "Context", "Source", "AddReverse", "Forms", "Example"]);
+  assert.deepEqual(A.MODEL_DEF.inOrderFields, ["Word", "Translation", "Context", "Source", "AddReverse", "Forms", "Example", "OnlyReverse"]);
   assert.equal(A.MODEL_DEF.modelName, "Word Clipper");
   assert.equal(A.MODEL_DEF.cardTemplates.length, 2);
   const rev = A.MODEL_DEF.cardTemplates[1];
@@ -136,4 +136,17 @@ test("buildNoteFields stores example in the Example field", () => {
     example: "Das Haus ist alt.",
   });
   assert.equal(f.Example, "Das Haus ist alt.");
+});
+
+test("reverse-only: forward template is suppressed via OnlyReverse", () => {
+  const fwd = A.MODEL_DEF.cardTemplates[0].Front;
+  assert.ok(fwd.startsWith("{{^OnlyReverse}}"));
+  assert.ok(fwd.endsWith("{{/OnlyReverse}}"));
+  const f = A.buildNoteFields({
+    word: "Haus", translation: "дом", context: "", source: "",
+    reverse: true, onlyReverse: true,
+  });
+  assert.equal(f.AddReverse, "y");
+  assert.equal(f.OnlyReverse, "y");
+  assert.equal(A.buildNoteFields({ word: "x", translation: "", context: "", source: "", reverse: true }).OnlyReverse, "");
 });

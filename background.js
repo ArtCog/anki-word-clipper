@@ -61,7 +61,7 @@ async function ensureModel() {
     // migration: older installs lack the Forms/Example fields
     const fields = await ankiFetch("modelFieldNames", { modelName: AnkiClient.MODEL_NAME });
     let added = false;
-    for (const f of ["Forms", "Example"]) {
+    for (const f of ["Forms", "Example", "OnlyReverse"]) {
       if (!fields.includes(f)) {
         await ankiFetch("modelFieldAdd", { modelName: AnkiClient.MODEL_NAME, fieldName: f });
         added = true;
@@ -140,7 +140,11 @@ async function addNote(note) {
   try {
     const req = note.cardType === "cloze"
       ? AnkiClient.buildClozeNoteRequest(note)
-      : AnkiClient.buildAddNoteRequest({ ...note, reverse: note.cardType === "reverse" });
+      : AnkiClient.buildAddNoteRequest({
+          ...note,
+          reverse: note.cardType === "reverse" || note.cardType === "reverseOnly",
+          onlyReverse: note.cardType === "reverseOnly",
+        });
     await ankiFetch(req.action, req.params);
     await patchSettings({ lastDeck: note.deck });
     return { ok: true };

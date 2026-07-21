@@ -176,7 +176,8 @@
       <div class="wc-example"></div>
       <label>Тип карточки</label><select class="wc-type">
         <option value="basic">Обычная (слово → перевод)</option>
-        <option value="reverse">Двусторонняя (+ перевод → слово)</option>
+        <option value="reverse">Двусторонняя (обе стороны)</option>
+        <option value="reverseOnly">Обратная (только перевод → слово)</option>
         <option value="cloze">Пропуск в предложении (cloze)</option>
       </select>
       <label>Колода</label><select class="wc-deck"></select>

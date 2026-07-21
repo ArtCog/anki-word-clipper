@@ -17,14 +17,15 @@ function buildModelDef(ttsLang = "de_DE") {
   const tts = ttsLang && ttsLang !== "off" ? `{{tts ${ttsLang}:Word}}` : "";
   return {
     modelName: MODEL_NAME,
-    // Forms/Example are last: modelFieldAdd appends, so migrated models match new ones
-    inOrderFields: ["Word", "Translation", "Context", "Source", "AddReverse", "Forms", "Example"],
+    // Forms/Example/OnlyReverse are last: modelFieldAdd appends, so migrated models match new ones
+    inOrderFields: ["Word", "Translation", "Context", "Source", "AddReverse", "Forms", "Example", "OnlyReverse"],
     css: CARD_CSS,
     isCloze: false,
     cardTemplates: [
       {
         Name: "Word → Translation",
-        Front: `<div class="word">{{Word}}</div>${tts}`,
+        // {{^OnlyReverse}} suppresses the forward card for reverse-only notes
+        Front: `{{^OnlyReverse}}<div class="word">{{Word}}</div>${tts}{{/OnlyReverse}}`,
         Back: `{{FrontSide}}<hr id="answer"><div class="translation">{{Translation}}</div><div class="forms">{{Forms}}</div><div class="context">{{Context}}</div><div class="example">{{Example}}</div>`,
       },
       {
@@ -76,7 +77,7 @@ function boldWord(contextEscaped, wordEscaped) {
 
 // matchWord: the text as it appeared on the page (for bolding/cloze) when
 // `word` was normalized to a dictionary headword by the AI provider.
-function buildNoteFields({ word, translation, context, source, reverse, matchWord, forms, example }) {
+function buildNoteFields({ word, translation, context, source, reverse, onlyReverse, matchWord, forms, example }) {
   const w = escapeHtml(String(word).trim());
   const m = escapeHtml(String(matchWord ?? word).trim());
   return {
@@ -87,6 +88,7 @@ function buildNoteFields({ word, translation, context, source, reverse, matchWor
     AddReverse: reverse ? "y" : "",
     Forms: escapeHtml(String(forms ?? "").trim()),
     Example: escapeHtml(String(example ?? "").trim()),
+    OnlyReverse: onlyReverse ? "y" : "",
   };
 }
 
