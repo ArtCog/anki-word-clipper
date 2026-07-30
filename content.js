@@ -381,8 +381,10 @@
     if (res.provider === "ai") {
       aiForms = res.forms ?? "";
       aiExample = res.example ?? "";
-      // verbs keep the form selected on the page; nouns get article + plural
-      if (res.headword && !aiForms && !trEdited) q(".wc-word").value = res.headword;
+      // a single verb keeps the form seen on the page; everything else (nouns,
+      // multi-word selections, idioms, paired conjunctions) gets the dictionary unit
+      const multiWord = /\s/.test(q(".wc-word").value.trim());
+      if (res.headword && (multiWord || !aiForms) && !trEdited) q(".wc-word").value = res.headword;
       q(".wc-note").textContent = [aiForms, res.note].filter(Boolean).join(" · ");
       q(".wc-example").textContent = aiExample;
     } else if (res.fallbackError) {
@@ -453,8 +455,8 @@
       translation = tr.translation;
       forms = tr.forms ?? "";
       example = tr.example ?? "";
-      // verbs keep the form from the page; nouns get article + plural
-      if (tr.provider === "ai" && tr.headword && !forms) word = tr.headword;
+      // same rule as in the form: only a single verb keeps its page form
+      if (tr.provider === "ai" && tr.headword && (/\s/.test(cap.word.trim()) || !forms)) word = tr.headword;
     }
     const note = {
       word, matchWord: cap.word, translation, forms, example, context: cap.context, source: cap.source,

@@ -136,3 +136,10 @@ test("parseBatchResponse validates, filters and caps items", () => {
   assert.equal(T.parseBatchResponse(wrap("мусор")), null);
   assert.equal(T.parseBatchResponse(null), null);
 });
+
+test("prompt makes the lexical unit the headword, not the selected word", () => {
+  const sys = sysOf(ai({ word: "weder", context: "Er beschreibt weder das eine noch das andere." }));
+  assert.ok(sys.includes("weder ... noch"));
+  assert.ok(sys.includes("das Steuer in der Hand haben"));
+  assert.ok(/translation of the HEADWORD/i.test(sys));
+});

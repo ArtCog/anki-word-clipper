@@ -19,6 +19,7 @@ const AI_PRESETS = {
     model: "gpt-4o-mini",
     keyUrl: "https://platform.openai.com/api-keys",
   },
+  bridge: { url: "http://localhost:8770/v1", model: "claude-opus", keyUrl: null },
   ollama: { url: "http://localhost:11434/v1", model: "llama3.1", keyUrl: null },
   custom: { url: "", model: "", keyUrl: null },
 };
