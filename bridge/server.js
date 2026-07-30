@@ -12,28 +12,58 @@
 // so nothing outside this machine can reach it.
 
 const http = require("http");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const { spawn } = require("child_process");
 
 const PORT = Number(process.env.PORT || 8770);
+const SSH = process.env.HERMES_SSH || "-i ~/.ssh/id_ed25519_hetzner -o ConnectTimeout=15 root@91.98.164.161";
 
-// model id -> how to invoke the CLI. Prompt always goes in via stdin, so no
-// shell escaping can break on quotes or newlines.
+// model id -> how to invoke the CLI. The prompt always goes in on stdin, so
+// nothing can break on quotes or newlines.
+//
+// mode explains how to read the answer back:
+//   json        parse stdout as Claude Code's JSON envelope, take .result
+//               (raw `claude -p` stdout also carries hook/output-style noise)
+//   lastMessage read the file given to --output-last-message
+//               (plain `codex exec` stdout carries a session banner + "tokens used")
+//   raw         stdout is already clean
 const BACKENDS = {
-  "claude-haiku": { cmd: "claude", args: ["-p", "--model", "haiku"] },
-  "claude-sonnet": { cmd: "claude", args: ["-p", "--model", "sonnet"] },
-  "claude-opus": { cmd: "claude", args: ["-p", "--model", "opus"] },
-  codex: { cmd: "codex", args: ["exec"] },
-  gemini: { cmd: "gemini", args: [] },
+  "claude-haiku": { cmd: "claude", args: ["-p", "--output-format", "json", "--model", "haiku"], mode: "json" },
+  "claude-sonnet": { cmd: "claude", args: ["-p", "--output-format", "json", "--model", "sonnet"], mode: "json" },
+  "claude-opus": { cmd: "claude", args: ["-p", "--output-format", "json", "--model", "opus"], mode: "json" },
+  codex: { cmd: "codex", args: ["exec"], mode: "lastMessage" },
+  // no headless Antigravity on Windows: the agy-print wrapper lives on Hermes
+  antigravity: { cmd: "ssh", args: [...SSH.split(/\s+/), "/root/.hermes/bin/agy-print"], mode: "raw" },
+  gemini: { cmd: "gemini", args: [], mode: "raw" },
 };
 
-const TIMEOUT_MS = Number(process.env.BRIDGE_TIMEOUT || 90000);
+const TIMEOUT_MS = Number(process.env.BRIDGE_TIMEOUT || 120000);
+
+// tolerate leading noise before the JSON envelope
+function parseEnvelope(stdout) {
+  const s = stdout.trim();
+  const start = s.indexOf("{");
+  const end = s.lastIndexOf("}");
+  if (start === -1 || end <= start) throw new Error(`no JSON in output: ${s.slice(0, 200)}`);
+  const d = JSON.parse(s.slice(start, end + 1));
+  if (d.is_error) throw new Error(String(d.result || "CLI reported an error"));
+  return String(d.result ?? "");
+}
 
 function runCli(id, prompt) {
   const b = BACKENDS[id];
   if (!b) return Promise.reject(new Error(`unknown model "${id}", try: ${Object.keys(BACKENDS).join(", ")}`));
+
+  const outFile = b.mode === "lastMessage"
+    ? path.join(os.tmpdir(), `awc-bridge-${process.pid}-${Date.now()}.txt`)
+    : null;
+  const args = outFile ? [...b.args, "--output-last-message", outFile] : b.args;
+
   return new Promise((resolve, reject) => {
     // shell:true is required on Windows, where these CLIs are .cmd shims
-    const p = spawn(b.cmd, b.args, { shell: true, windowsHide: true });
+    const p = spawn(b.cmd, args, { shell: true, windowsHide: true });
     let out = "", err = "";
     const timer = setTimeout(() => { p.kill(); reject(new Error(`${b.cmd} timed out after ${TIMEOUT_MS}ms`)); }, TIMEOUT_MS);
     p.stdout.on("data", (d) => (out += d));
@@ -41,18 +71,22 @@ function runCli(id, prompt) {
     p.on("error", (e) => { clearTimeout(timer); reject(e); });
     p.on("close", (code) => {
       clearTimeout(timer);
-      if (code !== 0 && !out.trim()) return reject(new Error(err.trim().slice(-400) || `${b.cmd} exited ${code}`));
-      resolve(out.trim());
+      try {
+        if (b.mode === "lastMessage") {
+          const text = fs.readFileSync(outFile, "utf8").trim();
+          fs.unlink(outFile, () => {});
+          if (!text) throw new Error(err.trim().slice(-400) || `${b.cmd} exited ${code} with empty answer`);
+          return resolve(text);
+        }
+        if (code !== 0 && !out.trim()) throw new Error(err.trim().slice(-400) || `${b.cmd} exited ${code}`);
+        resolve(b.mode === "json" ? parseEnvelope(out) : out.trim());
+      } catch (e) {
+        if (outFile) fs.unlink(outFile, () => {});
+        reject(e);
+      }
     });
     p.stdin.end(prompt);
   });
-}
-
-// Codex prints a run header/footer around the answer; keep only the payload.
-function cleanup(text, id) {
-  if (id !== "codex") return text;
-  const lines = text.split("\n").filter((l) => !/^\[?\d{4}-\d{2}-\d{2}|^(workdir|model|provider|approval|sandbox|reasoning|tokens used|--------)/i.test(l.trim()));
-  return lines.join("\n").trim();
 }
 
 const flatten = (messages) =>
@@ -90,7 +124,7 @@ const server = http.createServer((req, res) => {
     const prompt = flatten(body.messages);
     const started = Date.now();
     try {
-      const text = cleanup(await runCli(id, prompt), id);
+      const text = await runCli(id, prompt);
       console.log(`[${new Date().toISOString().slice(11, 19)}] ${id} ok in ${Date.now() - started}ms`);
       send(res, 200, {
         id: `bridge-${started}`,

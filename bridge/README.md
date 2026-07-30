@@ -24,21 +24,33 @@ node bridge/server.js
 
 Попап → «Перевод» → движок **ИИ** → провайдер **«Мои подписки через мост»**. URL и модель подставятся сами, поле ключа оставь пустым.
 
-Доступные модели (поле «Модель»):
+Доступные модели (поле «Модель»), замеры на одном и том же слове:
 
-| id | что вызывает | нужна подписка |
-|---|---|---|
-| `claude-opus` | `claude -p --model opus` | Claude Max |
-| `claude-sonnet` | `claude -p --model sonnet` | Claude Pro/Max |
-| `claude-haiku` | `claude -p --model haiku` | Claude Pro/Max |
-| `codex` | `codex exec` | ChatGPT Plus/Pro |
-| `gemini` | `gemini` | Google AI Pro |
+| id | что вызывает | подписка | замер |
+|---|---|---|---|
+| `claude-opus` | `claude -p --output-format json --model opus` | Claude Max | 15 с |
+| `claude-sonnet` | то же, `--model sonnet` | Claude Pro/Max | ~20 с |
+| `claude-haiku` | то же, `--model haiku` | Claude Pro/Max | 21 с |
+| `codex` | `codex exec --output-last-message` | ChatGPT Plus/Pro | 59 с |
+| `antigravity` | `ssh hermes /root/.hermes/bin/agy-print` | подписка Antigravity | 38 с |
+| `gemini` | `gemini` | Google AI Pro | требует логина CLI |
 
 Проверить, что мост поднялся: открой `http://localhost:8770/v1/models` в браузере.
 
+### Почему Antigravity идёт через сервер
+
+Локально у Antigravity нет headless-режима: `antigravity.exe` это IDE (`--diff`, `--merge`, `--goto`). Обёртка `agy-print` живёт на сервере Hermes, поэтому мост зовёт её по SSH. Отсюда лишние секунды на дорогу и зависимость от доступности сервера. Переопределить строку подключения: переменная `HERMES_SSH`.
+
+### Ловушки, из-за которых наивная обёртка ломается
+
+- `claude -p` без `--output-format json`: в stdout попадает вывод твоих хуков и output styles (реально видели `PONYTAIL MODE ACTIVE` перед ответом), парсинг JSON разваливается. Мост берёт поле `result` из конверта.
+- `codex exec` без `--output-last-message`: в stdout баннер сессии и строка `tokens used`. Мост читает ответ из файла.
+
+Обе ловушки описаны в `C:\Projects\_reference\AI-BRAINS.md`.
+
 ## Чем платишь за качество
 
-**Скорость.** Замеры на этой машине: Gemini по API отвечает за 1-2 секунды, мост через `claude-opus` за 15 секунд, `claude-haiku` иногда до 40 (CLI каждый раз стартует заново). Для одного трудного слова терпимо, для разбора абзаца ждать долго.
+**Скорость.** Замеры на этой машине: Gemini по HTTP отвечает за 5-6 секунд, мост через Claude за 15-21, Antigravity за 38, Codex за 59. CLI каждый раз поднимает агентную сессию заново, это неустранимо. Для одного трудного слова терпимо, для разбора абзаца долго.
 
 **Лимиты подписки.** Запросы расходуют тот же лимит, что и твоя работа в Claude Code. Перевод слов может съедать квоту, нужную для кода.
 
