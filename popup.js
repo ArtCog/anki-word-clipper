@@ -83,6 +83,7 @@ async function init() {
     $("aipreset").value = presetName;
     const p = AI_PRESETS[presetName];
     if (p.keyUrl) { $("aikeylink").hidden = false; $("aikeylink").href = p.keyUrl; }
+    $("bridgehint").hidden = presetName !== "bridge";
   }
 
   $("instant").addEventListener("change", () => set({ instantMode: $("instant").checked }));
