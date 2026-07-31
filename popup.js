@@ -110,6 +110,7 @@ async function init() {
     const link = $("aikeylink");
     link.hidden = !p.keyUrl;
     if (p.keyUrl) { link.href = p.keyUrl; $("aikey").focus(); }
+    $("bridgehint").hidden = $("aipreset").value !== "bridge";
   });
   $("aiurl").addEventListener("change", () => set({ aiBaseUrl: $("aiurl").value.trim() }));
   $("aimodel").addEventListener("change", () => set({ aiModel: $("aimodel").value.trim() }));

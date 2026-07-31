@@ -140,7 +140,7 @@
               <option value="gemini">Google Gemini (бесплатный ключ)</option>
               <option value="openrouter">OpenRouter</option>
               <option value="openai">OpenAI</option>
-              <option value="bridge">Мои подписки через мост (Claude, Codex)</option>
+              <option value="bridge">Мои подписки через мост (Claude, Codex, Antigravity)</option>
               <option value="ollama">Ollama (локально, без ключа)</option>
               <option value="custom">Свой (OpenAI-совместимый)</option>
             </select>
@@ -151,6 +151,7 @@
           <label class="field">Модель
             <input type="text" id="aimodel" placeholder="напр. gemini-2.5-flash">
           </label>
+          <p class="subnote" id="bridgehint" hidden>Модели моста: claude-opus, claude-sonnet, claude-haiku, codex, antigravity, gemini. Сначала запусти <code>node bridge/server.js</code>. Ответ идёт 20-60 с, это цена подписки без API-ключа.</p>
           <label class="field">API-ключ (Ollama — оставь пустым)
             <input type="text" id="aikey" placeholder="ключ провайдера">
           </label>
