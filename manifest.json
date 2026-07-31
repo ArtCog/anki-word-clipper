@@ -1,9 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Anki Word Clipper",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Быстро добавляет выделенное слово с контекстом предложения в Anki через AnkiConnect. Опционально: перевод и словарная форма через Google/DeepL/ИИ.",
-  "permissions": ["storage", "contextMenus", "activeTab"],
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "activeTab"
+  ],
   "host_permissions": [
     "http://127.0.0.1:8765/*",
     "https://translate.googleapis.com/*",
@@ -14,15 +18,22 @@
     "https://api.openai.com/*",
     "http://localhost/*"
   ],
-  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
   "background": {
-    "service_worker": "background.js",
-    "scripts": ["anki-client.js", "translator.js", "background.js"]
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["context-extract.js", "content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "context-extract.js",
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -43,11 +54,10 @@
   },
   "commands": {
     "open-clipper-form": {
-      "suggested_key": { "default": "Alt+A" },
+      "suggested_key": {
+        "default": "Alt+A"
+      },
       "description": "Добавить выделение в Anki (форма)"
     }
-  },
-  "browser_specific_settings": {
-    "gecko": { "id": "anki-word-clipper@arturx.art", "strict_min_version": "115.0" }
   }
 }

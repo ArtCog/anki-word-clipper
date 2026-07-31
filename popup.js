@@ -6,23 +6,81 @@ const set = (patch) => api.runtime.sendMessage({ type: "SET_SETTINGS", patch });
 const AI_PRESETS = {
   gemini: {
     url: "https://generativelanguage.googleapis.com/v1beta/openai",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.6-flash",
     keyUrl: "https://aistudio.google.com/apikey",
+    models: [
+      ["gemini-3.6-flash", "Gemini 3.6 Flash — новее и умнее"],
+      ["gemini-3.5-flash", "Gemini 3.5 Flash"],
+      ["gemini-2.5-flash", "Gemini 2.5 Flash — проверено временем"],
+      ["gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite — самый щедрый лимит"],
+      ["gemini-2.5-pro", "Gemini 2.5 Pro — медленнее, умнее"],
+    ],
   },
   openrouter: {
     url: "https://openrouter.ai/api/v1",
     model: "google/gemini-2.5-flash",
     keyUrl: "https://openrouter.ai/settings/keys",
+    models: [
+      ["google/gemini-2.5-flash", "Gemini 2.5 Flash"],
+      ["anthropic/claude-sonnet-4.5", "Claude Sonnet 4.5"],
+      ["openai/gpt-4o-mini", "GPT-4o mini"],
+    ],
   },
   openai: {
     url: "https://api.openai.com/v1",
     model: "gpt-4o-mini",
     keyUrl: "https://platform.openai.com/api-keys",
+    models: [
+      ["gpt-4o-mini", "GPT-4o mini — дёшево и быстро"],
+      ["gpt-4o", "GPT-4o"],
+    ],
   },
-  bridge: { url: "http://localhost:8770/v1", model: "claude-opus", keyUrl: null },
-  ollama: { url: "http://localhost:11434/v1", model: "llama3.1", keyUrl: null },
-  custom: { url: "", model: "", keyUrl: null },
+  bridge: {
+    url: "http://localhost:8770/v1",
+    model: "claude-haiku",
+    keyUrl: null,
+    models: [
+      ["claude-haiku", "Claude Haiku (подписка Max) — 20 с"],
+      ["claude-sonnet", "Claude Sonnet (подписка Max)"],
+      ["claude-opus", "Claude Opus (подписка Max) — самый умный"],
+      ["antigravity", "Antigravity через сервер — 40 с"],
+      ["codex", "Codex (подписка ChatGPT) — 60 с"],
+      ["gemini", "Gemini CLI"],
+    ],
+  },
+  ollama: {
+    url: "http://localhost:11434/v1",
+    model: "llama3.1",
+    keyUrl: null,
+    models: [["llama3.1", "Llama 3.1"], ["qwen2.5", "Qwen 2.5"]],
+  },
+  custom: { url: "", model: "", keyUrl: null, models: [] },
 };
+
+const CUSTOM_MODEL = "__custom__";
+
+// fill the model dropdown for a preset; keeps `selected` chosen if it is known,
+// otherwise falls back to the free-text field
+function fillModels(presetName, selected) {
+  const sel = $("aimodelsel");
+  const list = AI_PRESETS[presetName]?.models ?? [];
+  sel.innerHTML = "";
+  for (const [id, label] of list) {
+    const o = document.createElement("option");
+    o.value = id;
+    o.textContent = label;
+    sel.append(o);
+  }
+  const other = document.createElement("option");
+  other.value = CUSTOM_MODEL;
+  other.textContent = "другая (вписать вручную)";
+  sel.append(other);
+
+  const known = list.some(([id]) => id === selected);
+  sel.value = known ? selected : CUSTOM_MODEL;
+  sel.parentElement.hidden = list.length === 0;
+  $("aimodel").parentElement.hidden = list.length > 0 && known;
+}
 
 function showEngine(engine) {
   $("eng-deepl").hidden = engine !== "deepl";
@@ -84,6 +142,9 @@ async function init() {
     const p = AI_PRESETS[presetName];
     if (p.keyUrl) { $("aikeylink").hidden = false; $("aikeylink").href = p.keyUrl; }
     $("bridgehint").hidden = presetName !== "bridge";
+    fillModels(presetName, s.aiModel ?? "");
+  } else {
+    fillModels("custom", s.aiModel ?? "");
   }
 
   $("instant").addEventListener("change", () => set({ instantMode: $("instant").checked }));
@@ -112,8 +173,16 @@ async function init() {
     link.hidden = !p.keyUrl;
     if (p.keyUrl) { link.href = p.keyUrl; $("aikey").focus(); }
     $("bridgehint").hidden = $("aipreset").value !== "bridge";
+    fillModels($("aipreset").value, p.model);
   });
   $("aiurl").addEventListener("change", () => set({ aiBaseUrl: $("aiurl").value.trim() }));
+  $("aimodelsel").addEventListener("change", () => {
+    const v = $("aimodelsel").value;
+    const manual = v === CUSTOM_MODEL;
+    $("aimodel").parentElement.hidden = !manual;
+    if (manual) $("aimodel").focus();
+    else { $("aimodel").value = v; set({ aiModel: v }); }
+  });
   $("aimodel").addEventListener("change", () => set({ aiModel: $("aimodel").value.trim() }));
   $("aikey").addEventListener("change", () => set({ aiKey: $("aikey").value.trim() }));
   $("aiextra").addEventListener("change", () => set({ aiExtra: $("aiextra").value.trim() }));

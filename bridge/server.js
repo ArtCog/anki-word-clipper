@@ -142,5 +142,5 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`Anki Word Clipper bridge: http://localhost:${PORT}/v1`);
   console.log(`Модели: ${Object.keys(BACKENDS).join(", ")}`);
-  console.log("В попапе расширения: провайдер «Свой», ключ оставить пустым.");
+  console.log("В попапе расширения: провайдер «Мои подписки через мост», ключ оставить пустым.");
 });

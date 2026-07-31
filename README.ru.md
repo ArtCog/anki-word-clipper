@@ -17,12 +17,13 @@
 1. `chrome://extensions` → включи **Developer mode**.
 2. Скачай ZIP из [Releases](https://github.com/ArtCog/anki-word-clipper/releases) и распакуй в постоянную папку (или клонируй репозиторий).
 3. **Load unpacked** → выбери эту папку.
-3. Предупреждения про `background.scripts` и `browser_specific_settings` — норма (это ключи для Firefox), Chrome их просто игнорирует.
+3. Предупреждений быть не должно: `manifest.json` рассчитан только на Chrome. Вариант для Firefox лежит рядом, `manifest.firefox.json`.
 
 ### 3. Расширение — Firefox
 
-1. `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on…** → выбери `manifest.json`.
-2. В `about:addons` → Anki Word Clipper → **Permissions** → включи «Access your data for all websites» (в Firefox MV3 доступ к страницам выдаётся вручную).
+1. Переименуй `manifest.firefox.json` в `manifest.json` (в Firefox MV3 фон работает через event page, а не service worker).
+2. `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on…** → выбери `manifest.json`.
+3. В `about:addons` → Anki Word Clipper → **Permissions** → включи «Access your data for all websites» (в Firefox MV3 доступ к страницам выдаётся вручную).
 
 ### 4. Первое подключение
 

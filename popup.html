@@ -149,6 +149,9 @@
             <input type="text" id="aiurl" placeholder="https://…/v1">
           </label>
           <label class="field">Модель
+            <select id="aimodelsel"></select>
+          </label>
+          <label class="field">Название модели
             <input type="text" id="aimodel" placeholder="напр. gemini-2.5-flash">
           </label>
           <p class="subnote" id="bridgehint" hidden>Модели моста: claude-opus, claude-sonnet, claude-haiku, codex, antigravity, gemini. Сначала запусти <code>node bridge/server.js</code>. Ответ идёт 20-60 с, это цена подписки без API-ключа.</p>

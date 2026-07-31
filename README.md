@@ -17,12 +17,13 @@ Browser extension (Chrome + Firefox): select a word or phrase on any page — an
 1. Open `chrome://extensions` and enable **Developer mode**.
 2. Download the ZIP from [Releases](https://github.com/ArtCog/anki-word-clipper/releases) and unpack it into a permanent folder (or clone this repository).
 3. **Load unpacked** → pick that folder.
-4. Warnings about `background.scripts` and `browser_specific_settings` are expected — those keys are for Firefox; Chrome ignores them.
+4. No warnings should appear: `manifest.json` is Chrome-only. The Firefox variant ships next to it as `manifest.firefox.json`.
 
 ### 3. Extension — Firefox
 
-1. `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on…** → pick `manifest.json`.
-2. In `about:addons` → Anki Word Clipper → **Permissions** → enable “Access your data for all websites” (Firefox MV3 grants host access manually).
+1. Rename `manifest.firefox.json` to `manifest.json` (Firefox MV3 uses event pages, not service workers).
+2. `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on…** → pick `manifest.json`.
+3. In `about:addons` → Anki Word Clipper → **Permissions** → enable “Access your data for all websites” (Firefox MV3 grants host access manually).
 
 ### 4. First connection
 
