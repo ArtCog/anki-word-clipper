@@ -37,15 +37,14 @@ const AI_PRESETS = {
   },
   bridge: {
     url: "http://localhost:8770/v1",
-    model: "claude-haiku",
+    model: "antigravity",
     keyUrl: null,
     models: [
-      ["claude-haiku", "Claude Haiku (подписка Max) — 20 с"],
-      ["claude-sonnet", "Claude Sonnet (подписка Max)"],
-      ["claude-opus", "Claude Opus (подписка Max) — самый умный"],
-      ["antigravity", "Antigravity через сервер — 40 с"],
-      ["codex", "Codex (подписка ChatGPT) — 60 с"],
-      ["gemini", "Gemini CLI"],
+      ["antigravity", "Gemini 3.6 Flash — подписка Google, ~40 с"],
+      ["claude-haiku", "Claude Haiku — подписка Claude, ~20 с"],
+      ["claude-sonnet", "Claude Sonnet — подписка Claude, ~30 с"],
+      ["claude-opus", "Claude Opus — подписка Claude, самый умный"],
+      ["codex", "GPT 5.6 — подписка ChatGPT, ~60 с"],
     ],
   },
   ollama: {

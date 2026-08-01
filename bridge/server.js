@@ -36,7 +36,6 @@ const BACKENDS = {
   codex: { cmd: "codex", args: ["exec"], mode: "lastMessage" },
   // no headless Antigravity on Windows: the agy-print wrapper lives on Hermes
   antigravity: { cmd: "ssh", args: [...SSH.split(/\s+/), "/root/.hermes/bin/agy-print"], mode: "raw" },
-  gemini: { cmd: "gemini", args: [], mode: "raw" },
 };
 
 const TIMEOUT_MS = Number(process.env.BRIDGE_TIMEOUT || 120000);
@@ -89,8 +88,19 @@ function runCli(id, prompt) {
   });
 }
 
-const flatten = (messages) =>
-  (messages || []).map((m) => (m.role === "system" ? m.content : `${m.content}`)).join("\n\n");
+// The CLIs run with their own agent persona (Claude Code introduces itself,
+// Codex narrates). Fence the caller's system prompt and demand bare output,
+// otherwise answers arrive wrapped in chat prose.
+function flatten(messages) {
+  const msgs = messages || [];
+  const sys = msgs.filter((m) => m.role === "system").map((m) => m.content).join("\n");
+  const rest = msgs.filter((m) => m.role !== "system").map((m) => m.content).join("\n\n");
+  return (
+    (sys ? `<instructions>\n${sys}\n</instructions>\n\n` : "") +
+    rest +
+    "\n\nOutput ONLY what the instructions require. No preamble, no commentary, no self-introduction."
+  );
+}
 
 function send(res, code, obj) {
   const body = JSON.stringify(obj);

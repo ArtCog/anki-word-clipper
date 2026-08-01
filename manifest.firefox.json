@@ -23,7 +23,11 @@
     "http://*/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "scripts": [
+      "anki-client.js",
+      "translator.js",
+      "background.js"
+    ]
   },
   "content_scripts": [
     {
@@ -58,6 +62,12 @@
         "default": "Alt+A"
       },
       "description": "Добавить выделение в Anki (форма)"
+    }
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "anki-word-clipper@arturx.art",
+      "strict_min_version": "115.0"
     }
   }
 }
