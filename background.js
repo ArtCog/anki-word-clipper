@@ -11,7 +11,9 @@ const DEFAULT_SETTINGS = {
   autoTranslate: true, targetLang: "ru", level: "",
   engine: "google",                   // "google" | "deepl" | "ai" — сhosen translation engine
   deeplKey: "",
-  aiBaseUrl: "", aiModel: "", aiKey: "", aiExtra: "", aiExample: false,
+  // aiKey is the key of the ACTIVE provider; aiKeys remembers one per provider
+  // so switching providers never sends Google's key to OpenRouter and back.
+  aiBaseUrl: "", aiModel: "", aiKey: "", aiKeys: {}, aiExtra: "", aiExample: false,
   ttsLang: "off",                     // Anki tts lang tag: "off" | "de_DE" | "en_US" | …
   modelTtsLang: null,                 // internal: tts lang the main model was built with
 };

@@ -9,10 +9,10 @@ const AI_PRESETS = {
     model: "gemini-3.6-flash",
     keyUrl: "https://aistudio.google.com/apikey",
     models: [
-      ["gemini-3.6-flash", "Gemini 3.6 Flash — новее и умнее"],
+      ["gemini-3.6-flash", "Gemini 3.6 Flash — самая свежая, рекомендую"],
       ["gemini-3.5-flash", "Gemini 3.5 Flash"],
+      ["gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite — щедрый лимит"],
       ["gemini-2.5-flash", "Gemini 2.5 Flash — проверено временем"],
-      ["gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite — самый щедрый лимит"],
       ["gemini-2.5-pro", "Gemini 2.5 Pro — медленнее, умнее"],
     ],
   },
@@ -23,28 +23,21 @@ const AI_PRESETS = {
     models: [
       ["google/gemini-2.5-flash", "Gemini 2.5 Flash"],
       ["anthropic/claude-sonnet-4.5", "Claude Sonnet 4.5"],
-      ["openai/gpt-4o-mini", "GPT-4o mini"],
-    ],
-  },
-  openai: {
-    url: "https://api.openai.com/v1",
-    model: "gpt-4o-mini",
-    keyUrl: "https://platform.openai.com/api-keys",
-    models: [
-      ["gpt-4o-mini", "GPT-4o mini — дёшево и быстро"],
-      ["gpt-4o", "GPT-4o"],
+      ["inclusionai/ling-3.0-flash:free", "Ling 3.0 Flash — бесплатная"],
     ],
   },
   bridge: {
     url: "http://localhost:8770/v1",
-    model: "antigravity",
+    model: "claude-haiku",
     keyUrl: null,
     models: [
+      ["claude-haiku", "Claude Haiku — подписка Claude, всегда последняя, ~20 с"],
+      ["claude-sonnet", "Claude Sonnet — подписка Claude, всегда последняя, ~30 с"],
+      ["claude-opus", "Claude Opus — подписка Claude, всегда последняя, самый умный"],
       ["antigravity", "Gemini 3.6 Flash — подписка Google, ~40 с"],
-      ["claude-haiku", "Claude Haiku — подписка Claude, ~20 с"],
-      ["claude-sonnet", "Claude Sonnet — подписка Claude, ~30 с"],
-      ["claude-opus", "Claude Opus — подписка Claude, самый умный"],
-      ["codex", "GPT 5.6 — подписка ChatGPT, ~60 с"],
+      ["codex-sol", "GPT 5.6 Sol — подписка ChatGPT, ~60 с"],
+      ["codex-terra", "GPT 5.6 Terra — подписка ChatGPT"],
+      ["codex-luna", "GPT 5.6 Luna — подписка ChatGPT"],
     ],
   },
   ollama: {
@@ -57,6 +50,7 @@ const AI_PRESETS = {
 };
 
 const CUSTOM_MODEL = "__custom__";
+let savedKeys = {}; // provider id -> its own API key
 
 // fill the model dropdown for a preset; keeps `selected` chosen if it is known,
 // otherwise falls back to the free-text field
@@ -131,6 +125,7 @@ async function init() {
   $("aiurl").value = s.aiBaseUrl ?? "";
   $("aimodel").value = s.aiModel ?? "";
   $("aikey").value = s.aiKey ?? "";
+  savedKeys = { ...(s.aiKeys ?? {}) };
   $("aiextra").value = s.aiExtra ?? "";
   $("aiexample").checked = !!s.aiExample;
 
@@ -167,10 +162,14 @@ async function init() {
     if (!p) return;
     $("aiurl").value = p.url;
     $("aimodel").value = p.model;
-    set({ aiBaseUrl: p.url, aiModel: p.model }); // one atomic patch — no lost update
+    // each provider carries its own key; never hand Google's key to OpenRouter
+    const key = savedKeys[$("aipreset").value] ?? "";
+    $("aikey").value = key;
+    set({ aiBaseUrl: p.url, aiModel: p.model, aiKey: key }); // one atomic patch — no lost update
     const link = $("aikeylink");
     link.hidden = !p.keyUrl;
-    if (p.keyUrl) { link.href = p.keyUrl; $("aikey").focus(); }
+    if (p.keyUrl && !key) { link.href = p.keyUrl; $("aikey").focus(); }
+    else if (p.keyUrl) link.href = p.keyUrl;
     $("bridgehint").hidden = $("aipreset").value !== "bridge";
     fillModels($("aipreset").value, p.model);
   });
@@ -183,7 +182,11 @@ async function init() {
     else { $("aimodel").value = v; set({ aiModel: v }); }
   });
   $("aimodel").addEventListener("change", () => set({ aiModel: $("aimodel").value.trim() }));
-  $("aikey").addEventListener("change", () => set({ aiKey: $("aikey").value.trim() }));
+  $("aikey").addEventListener("change", () => {
+    const key = $("aikey").value.trim();
+    savedKeys[$("aipreset").value || "custom"] = key;
+    set({ aiKey: key, aiKeys: savedKeys });
+  });
   $("aiextra").addEventListener("change", () => set({ aiExtra: $("aiextra").value.trim() }));
   $("aiexample").addEventListener("change", () => set({ aiExample: $("aiexample").checked }));
   $("aitest").addEventListener("click", testAi);

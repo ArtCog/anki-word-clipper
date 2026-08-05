@@ -18,7 +18,11 @@ const path = require("path");
 const { spawn } = require("child_process");
 
 const PORT = Number(process.env.PORT || 8770);
-const SSH = process.env.HERMES_SSH || "-i ~/.ssh/id_ed25519_hetzner -o ConnectTimeout=15 root@91.98.164.161";
+// Antigravity has no headless mode on Windows, so its agy-print wrapper is
+// reached over SSH. Point HERMES_SSH at your OWN box, e.g.
+//   set HERMES_SSH=-i ~/.ssh/id_ed25519 -o ConnectTimeout=15 root@1.2.3.4
+// Nothing personal is hardcoded here: without the variable the backend is off.
+const SSH = (process.env.HERMES_SSH || "").trim();
 
 // model id -> how to invoke the CLI. The prompt always goes in on stdin, so
 // nothing can break on quotes or newlines.
@@ -30,12 +34,18 @@ const SSH = process.env.HERMES_SSH || "-i ~/.ssh/id_ed25519_hetzner -o ConnectTi
 //               (plain `codex exec` stdout carries a session banner + "tokens used")
 //   raw         stdout is already clean
 const BACKENDS = {
+  // "haiku"/"sonnet"/"opus" are aliases: Claude Code always resolves them to the
+  // newest release of that tier, so this list never goes stale.
   "claude-haiku": { cmd: "claude", args: ["-p", "--output-format", "json", "--model", "haiku"], mode: "json" },
   "claude-sonnet": { cmd: "claude", args: ["-p", "--output-format", "json", "--model", "sonnet"], mode: "json" },
   "claude-opus": { cmd: "claude", args: ["-p", "--output-format", "json", "--model", "opus"], mode: "json" },
+  // GPT ids come from the ChatGPT subscription (~/.codex/models_cache.json)
   codex: { cmd: "codex", args: ["exec"], mode: "lastMessage" },
-  // no headless Antigravity on Windows: the agy-print wrapper lives on Hermes
-  antigravity: { cmd: "ssh", args: [...SSH.split(/\s+/), "/root/.hermes/bin/agy-print"], mode: "raw" },
+  "codex-sol": { cmd: "codex", args: ["exec", "-m", "gpt-5.6-sol"], mode: "lastMessage" },
+  "codex-terra": { cmd: "codex", args: ["exec", "-m", "gpt-5.6-terra"], mode: "lastMessage" },
+  "codex-luna": { cmd: "codex", args: ["exec", "-m", "gpt-5.6-luna"], mode: "lastMessage" },
+  // only offered when the user pointed HERMES_SSH at a box of their own
+  ...(SSH ? { antigravity: { cmd: "ssh", args: [...SSH.split(/\s+/), "/root/.hermes/bin/agy-print"], mode: "raw" } } : {}),
 };
 
 const TIMEOUT_MS = Number(process.env.BRIDGE_TIMEOUT || 120000);
